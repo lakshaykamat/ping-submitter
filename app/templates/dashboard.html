@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% set title = "Dashboard" %}
+
+{% block content %}
+  <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+    <section class="space-y-6">
+      <div class="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h1 class="text-2xl font-semibold tracking-tight">Submission Jobs</h1>
+            <p class="mt-1 text-sm text-zinc-600">{{ jobs|length }} jobs tracked</p>
+          </div>
+          <a href="#new-job" class="rounded-md bg-zinc-950 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800">New job</a>
+        </div>
+
+        <form id="new-job" method="post" action="/jobs" class="mt-5 grid gap-4">
+          {% if error %}
+            <div class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</div>
+          {% endif %}
+          <div>
+            <label for="urls" class="text-sm font-medium text-zinc-800">URLs</label>
+            <textarea id="urls" name="urls" rows="4" required class="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-950 focus:ring-2 focus:ring-zinc-200">{{ (form_data.urls | join('\n')) if form_data else "" }}</textarea>
+          </div>
+          <div class="grid gap-3 sm:grid-cols-[1fr_160px]">
+            <fieldset>
+              <legend class="text-sm font-medium text-zinc-800">Sites</legend>
+              <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                {% for site in sites %}
+                  <label class="flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm">
+                    <input type="checkbox" name="sites" value="{{ site.id }}" checked class="h-4 w-4 rounded border-zinc-300 text-zinc-950">
+                    <span>{{ site.name }}</span>
+                  </label>
+                {% endfor %}
+              </div>
+            </fieldset>
+            <div>
+              <label for="max_attempts" class="text-sm font-medium text-zinc-800">Max attempts</label>
+              <input id="max_attempts" name="max_attempts" type="number" min="1" value="{{ form_data.max_attempts if form_data else 3 }}" class="mt-2 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-950 focus:ring-2 focus:ring-zinc-200">
+            </div>
+          </div>
+          <div class="flex justify-end">
+            <button class="w-full rounded-md bg-zinc-950 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 sm:w-auto">Create job</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
+        <div class="border-b border-zinc-200 px-5 py-4">
+          <h2 class="text-base font-semibold">Recent jobs</h2>
+        </div>
+        {% if jobs %}
+          <div class="max-w-full overflow-x-auto">
+            <table class="w-full table-fixed divide-y divide-zinc-200 text-sm">
+              <thead class="bg-zinc-50 text-left text-xs uppercase tracking-wide text-zinc-500">
+                <tr>
+                  <th class="w-[42%] px-5 py-3">Job</th>
+                  <th class="px-5 py-3">Status</th>
+                  <th class="px-5 py-3">URLs</th>
+                  <th class="px-5 py-3">Sites</th>
+                  <th class="px-5 py-3">Created</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-zinc-100">
+                {% for job in jobs %}
+                  <tr class="hover:bg-zinc-50">
+                    <td class="max-w-[240px] truncate px-5 py-3 font-mono text-xs"><a href="/jobs/{{ job.id }}" class="text-zinc-950 underline decoration-zinc-300 underline-offset-4">{{ job.id }}</a></td>
+                    <td class="px-5 py-3"><span class="rounded-full bg-zinc-100 px-2 py-1 text-xs font-medium text-zinc-700">{{ job.status }}</span></td>
+                    <td class="px-5 py-3">{{ job.url_count }}</td>
+                    <td class="px-5 py-3">{{ job.site_count }}</td>
+                    <td class="px-5 py-3 text-zinc-600">{{ job.created_at }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="px-5 py-10 text-sm text-zinc-500">No jobs yet.</div>
+        {% endif %}
+      </div>
+    </section>
+
+    <aside class="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+      <h2 class="text-base font-semibold">Activity</h2>
+      <div class="mt-4 space-y-3">
+        {% for event in events %}
+          <div class="border-l-2 border-zinc-200 pl-3">
+            <div class="flex items-center justify-between gap-3">
+              <span class="text-xs font-medium uppercase tracking-wide text-zinc-500">{{ event.event_type }}</span>
+              <span class="text-xs text-zinc-400">{{ event.created_at }}</span>
+            </div>
+            <p class="mt-1 text-sm text-zinc-800">{{ event.message }}</p>
+            {% if event.site_id %}
+              <p class="mt-1 truncate text-xs text-zinc-500">{{ event.site_id }} · {{ event.submitted_url }}</p>
+            {% endif %}
+          </div>
+        {% else %}
+          <p class="text-sm text-zinc-500">No activity yet.</p>
+        {% endfor %}
+      </div>
+    </aside>
+  </div>
+{% endblock %}

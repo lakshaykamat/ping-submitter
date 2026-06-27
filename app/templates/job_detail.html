@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% set title = "Job Detail" %}
+
+{% block head %}
+  {% if job and job.status in ["queued", "running", "waiting_for_captcha"] %}
+    <meta http-equiv="refresh" content="2">
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  {% if job %}
+    <div class="space-y-6">
+      <section class="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p class="font-mono text-xs text-zinc-500">{{ job.id }}</p>
+            <h1 class="mt-1 text-2xl font-semibold tracking-tight">Job detail</h1>
+            <div class="mt-3 flex flex-wrap gap-2 text-sm">
+              <span class="rounded-full bg-zinc-100 px-3 py-1 font-medium text-zinc-700">{{ job.status }}</span>
+              <span class="rounded-full bg-zinc-100 px-3 py-1 text-zinc-600">{{ job.url_count }} URLs</span>
+              <span class="rounded-full bg-zinc-100 px-3 py-1 text-zinc-600">{{ job.site_count }} sites</span>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <form method="post" action="/jobs/{{ job.id }}/run">
+              <button class="rounded-md bg-zinc-950 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800">Run now</button>
+            </form>
+            <a href="/api/jobs/{{ job.id }}/report.json" class="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-100">JSON</a>
+            <a href="/api/jobs/{{ job.id }}/report.md" class="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-100">Markdown</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div class="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+          <p class="text-xs uppercase tracking-wide text-zinc-500">Total</p>
+          <p class="mt-2 text-2xl font-semibold">{{ report.total_attempts }}</p>
+        </div>
+        <div class="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+          <p class="text-xs uppercase tracking-wide text-zinc-500">Success</p>
+          <p class="mt-2 text-2xl font-semibold">{{ report.success_count }}</p>
+        </div>
+        <div class="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+          <p class="text-xs uppercase tracking-wide text-zinc-500">Failed</p>
+          <p class="mt-2 text-2xl font-semibold">{{ report.failure_count }}</p>
+        </div>
+        <div class="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+          <p class="text-xs uppercase tracking-wide text-zinc-500">CAPTCHA</p>
+          <p class="mt-2 text-2xl font-semibold">{{ report.captcha_count }}</p>
+        </div>
+        <div class="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+          <p class="text-xs uppercase tracking-wide text-zinc-500">Duration</p>
+          <p class="mt-2 text-2xl font-semibold">{{ report.duration_seconds if report.duration_seconds is not none else "n/a" }}</p>
+        </div>
+      </section>
+
+      <div class="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <section class="min-w-0 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
+          <div class="border-b border-zinc-200 px-5 py-4">
+            <h2 class="text-base font-semibold">Attempts</h2>
+          </div>
+          <div class="max-w-full overflow-x-auto">
+            <table class="w-full table-fixed divide-y divide-zinc-200 text-sm">
+              <thead class="bg-zinc-50 text-left text-xs uppercase tracking-wide text-zinc-500">
+                <tr>
+                  <th class="w-20 px-5 py-3">Attempt</th>
+                  <th class="px-5 py-3">Site</th>
+                  <th class="hidden px-5 py-3 sm:table-cell">URL</th>
+                  <th class="w-28 px-5 py-3">Status</th>
+                  <th class="hidden w-24 px-5 py-3 md:table-cell">Retries</th>
+                  <th class="hidden w-28 px-5 py-3 sm:table-cell">Action</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-zinc-100">
+                {% for attempt in job.attempts %}
+                  <tr class="align-top">
+                    <td class="px-5 py-3 font-mono text-xs">{{ attempt.id }}</td>
+                    <td class="truncate px-5 py-3">{{ attempt.site_name }}</td>
+                    <td class="hidden truncate px-5 py-3 text-zinc-600 sm:table-cell">{{ attempt.submitted_url }}</td>
+                    <td class="px-5 py-3"><span class="rounded-full bg-zinc-100 px-2 py-1 text-xs font-medium text-zinc-700">{{ attempt.status }}</span></td>
+                    <td class="hidden px-5 py-3 md:table-cell">{{ attempt.retry_count }}</td>
+                    <td class="hidden px-5 py-3 sm:table-cell">
+                      {% for challenge in attempt.captcha_challenges %}
+                        {% if challenge.status == "captcha_required" %}
+                          <a href="/captcha/{{ challenge.id }}" class="rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium hover:bg-zinc-100">Solve CAPTCHA</a>
+                        {% endif %}
+                      {% endfor %}
+                    </td>
+                  </tr>
+                  {% if attempt.failure_reason %}
+                    <tr>
+                      <td></td>
+                      <td colspan="5" class="px-5 pb-3 text-xs text-red-700">{{ attempt.failure_reason }}</td>
+                    </tr>
+                  {% endif %}
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <aside class="min-w-0 rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+          <h2 class="text-base font-semibold">Activity</h2>
+          <div class="mt-4 max-h-[620px] space-y-3 overflow-y-auto pr-2">
+            {% for event in events %}
+              <div class="border-l-2 border-zinc-200 pl-3">
+                <div class="flex items-center justify-between gap-3">
+                  <span class="text-xs font-medium uppercase tracking-wide text-zinc-500">{{ event.event_type }}</span>
+                  <span class="text-xs text-zinc-400">{{ event.created_at }}</span>
+                </div>
+                <p class="mt-1 text-sm text-zinc-800">{{ event.message }}</p>
+                {% if event.context %}
+                  <pre class="mt-2 max-w-full whitespace-pre-wrap break-words rounded-md bg-zinc-950 p-2 text-xs text-zinc-100">{{ event.context }}</pre>
+                {% endif %}
+              </div>
+            {% else %}
+              <p class="text-sm text-zinc-500">No activity yet.</p>
+            {% endfor %}
+          </div>
+        </aside>
+      </div>
+
+      <section class="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 class="text-base font-semibold">Stored report</h2>
+            {% if report_record %}
+              <p class="mt-1 text-sm text-zinc-600">Generated {{ report_record.generated_at }}</p>
+            {% endif %}
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <a href="/api/jobs/{{ job.id }}/report.json" class="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium hover:bg-zinc-100">Download JSON</a>
+            <a href="/api/jobs/{{ job.id }}/report.md" class="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium hover:bg-zinc-100">Download Markdown</a>
+          </div>
+        </div>
+
+        {% if report_record %}
+          <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+            <div class="rounded-md bg-zinc-50 p-3">
+              <dt class="text-xs uppercase tracking-wide text-zinc-500">SQLite row</dt>
+              <dd class="mt-1 font-mono text-xs text-zinc-700">job_reports #{{ report_record.id }}</dd>
+            </div>
+            <div class="rounded-md bg-zinc-50 p-3">
+              <dt class="text-xs uppercase tracking-wide text-zinc-500">JSON file</dt>
+              <dd class="mt-1 break-all font-mono text-xs text-zinc-700">{{ report_record.json_path }}</dd>
+            </div>
+            <div class="rounded-md bg-zinc-50 p-3 sm:col-span-2">
+              <dt class="text-xs uppercase tracking-wide text-zinc-500">Markdown file</dt>
+              <dd class="mt-1 break-all font-mono text-xs text-zinc-700">{{ report_record.markdown_path }}</dd>
+            </div>
+          </dl>
+        {% endif %}
+
+        {% if report.submitted_urls %}
+          <div class="mt-5 grid gap-4 lg:grid-cols-2">
+            <div>
+              <h3 class="text-sm font-semibold">Submitted URLs</h3>
+              <ul class="mt-2 space-y-1 text-sm text-zinc-700">
+                {% for submitted_url in report.submitted_urls %}
+                  <li class="break-all rounded-md bg-zinc-50 px-3 py-2">{{ submitted_url }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+            <div>
+              <h3 class="text-sm font-semibold">Selected sites</h3>
+              <ul class="mt-2 space-y-1 text-sm text-zinc-700">
+                {% for site in report.selected_sites %}
+                  <li class="rounded-md bg-zinc-50 px-3 py-2">{{ site.name }} <span class="text-xs text-zinc-500">({{ site.id }})</span></li>
+                {% endfor %}
+              </ul>
+            </div>
+          </div>
+        {% endif %}
+
+        {% if report_markdown %}
+          <div class="mt-5">
+            <h3 class="text-sm font-semibold">Markdown preview</h3>
+            <pre class="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded-md bg-zinc-950 p-4 text-xs text-zinc-100">{{ report_markdown }}</pre>
+          </div>
+        {% endif %}
+      </section>
+    </div>
+  {% else %}
+    <section class="rounded-lg border border-zinc-200 bg-white p-8 shadow-sm">
+      <h1 class="text-xl font-semibold">Job not found</h1>
+      <a href="/" class="mt-4 inline-block rounded-md bg-zinc-950 px-4 py-2 text-sm font-medium text-white">Back to dashboard</a>
+    </section>
+  {% endif %}
+{% endblock %}

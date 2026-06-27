@@ -1,0 +1,9 @@
+.venv/
+.pytest_cache/
+__pycache__/
+*.pyc
+.env
+app.db
+logs/*.jsonl
+reports/*.json
+*.todo

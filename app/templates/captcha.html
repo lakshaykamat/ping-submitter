@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% set title = "CAPTCHA" %}
+
+{% block content %}
+  <section class="mx-auto max-w-4xl rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+    {% if challenge %}
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p class="text-xs uppercase tracking-wide text-zinc-500">Challenge {{ challenge.id }}</p>
+          <h1 class="mt-1 text-2xl font-semibold tracking-tight">CAPTCHA required</h1>
+          <p class="mt-2 text-sm text-zinc-600">Attempt {{ challenge.attempt_id }} · {{ challenge.status }}</p>
+        </div>
+        <a href="/jobs/{{ challenge.job_id }}" class="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium hover:bg-zinc-100">Back to job</a>
+      </div>
+
+      {% if challenge.screenshot_path %}
+        <div class="mt-5 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-50">
+          <img src="/captcha/{{ challenge.id }}/screenshot" alt="CAPTCHA screenshot" class="max-h-[520px] w-full object-contain">
+        </div>
+      {% endif %}
+
+      <form method="post" class="mt-5 flex flex-col gap-3 sm:flex-row">
+        <label for="answer" class="sr-only">Answer</label>
+        <input id="answer" name="answer" required placeholder="CAPTCHA answer" class="min-w-0 flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-950 focus:ring-2 focus:ring-zinc-200">
+        <button class="rounded-md bg-zinc-950 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800">Submit answer</button>
+      </form>
+    {% else %}
+      <h1 class="text-xl font-semibold">CAPTCHA challenge not found</h1>
+      <a href="/" class="mt-4 inline-block rounded-md bg-zinc-950 px-4 py-2 text-sm font-medium text-white">Back to dashboard</a>
+    {% endif %}
+  </section>
+{% endblock %}
