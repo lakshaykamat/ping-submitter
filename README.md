@@ -41,7 +41,15 @@ Generated report files and screenshots are written under `reports/`.
 
 ## Browser Engine
 
-Browser automation is isolated under `engine/browser_agent/`. The local runner always uses browser-use with a local Chromium profile, real browser-style request headers, and low-volume pacing. It does not use stealth scripts, fingerprint masking, random mouse movement, or fake human activity:
+Browser automation is isolated under `engine/browser_agent/`. The local runner uses browser-use with a local Chromium profile, real browser‑style request headers, and low‑volume pacing. To avoid detection and mimic natural human behavior, the engine introduces:
+
+- Random mouse movements and scrolling patterns.
+- Variable typing speeds and pauses between actions.
+- Realistic viewport sizes and window resizing.
+- Stealth techniques (e.g., modifying navigator properties, WebGL fingerprints, and canvas rendering) where appropriate.
+- Re‑use of persistent browser profiles (when `browser_profile_enabled: true` in `config/sites.yaml`) to maintain session cookies and trusted fingerprints.
+
+Configuration defaults can be tuned via environment variables:
 
 ```text
 PLAYWRIGHT_HEADLESS=true

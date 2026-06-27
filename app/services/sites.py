@@ -15,7 +15,7 @@ def normalize_site_config(site):
     normalized = dict(site)
     normalized["runner_mode"] = "agentic"
     normalized["captcha_policy"] = "none"
-    normalized.setdefault("browser_profile_enabled", False)
+    normalized.setdefault("browser_profile_enabled", True)
     normalized.setdefault("profile_account", "default")
     normalized.setdefault("pre_attempt_delay_seconds", None)
     return normalized

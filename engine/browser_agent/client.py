@@ -16,6 +16,8 @@ from engine.browser_agent.events import record_browser_session_event
 from engine.browser_agent.results import parse_agent_result, result_with_history_metadata
 from engine.prompts import build_agent_task
 
+STEALTH_INIT_SCRIPT_ID_ATTR = "_job_assessment_playwright_stealth_init_script_id"
+
 
 class BrowserUseAgentRunner:
     def __init__(self, agent_client=None, sleep=None, settings=None):
@@ -120,6 +122,39 @@ async def apply_cdp_request_headers(cdp_session, headers=None):
     )
 
 
+def playwright_stealth_script():
+    try:
+        from playwright_stealth import Stealth
+    except ImportError as import_error:
+        raise BrowserUseAgentError(
+            "playwright-stealth is not installed. Run pip install -r requirements.txt."
+        ) from import_error
+
+    stealth = Stealth(
+        navigator_platform_override="MacIntel",
+        navigator_user_agent_override=DEFAULT_USER_AGENT,
+        webgl_renderer_override="Intel Iris OpenGL Engine",
+        webgl_vendor_override="Intel Inc.",
+    )
+    return stealth.script_payload
+
+
+async def apply_playwright_stealth(cdp_session, script=None):
+    if getattr(cdp_session, STEALTH_INIT_SCRIPT_ID_ATTR, None):
+        return
+
+    stealth_script = script if script is not None else playwright_stealth_script()
+    if not stealth_script:
+        return
+
+    result = await cdp_session.cdp_client.send.Page.addScriptToEvaluateOnNewDocument(
+        params={"source": stealth_script, "runImmediately": True},
+        session_id=cdp_session.session_id,
+    )
+    script_identifier = result.get("identifier") if isinstance(result, dict) else None
+    setattr(cdp_session, STEALTH_INIT_SCRIPT_ID_ATTR, script_identifier or True)
+
+
 def browser_session_with_headers(base_session_class):
     class BrowserSessionWithHeaders(base_session_class):
         async def _navigate_and_wait(
@@ -131,6 +166,7 @@ def browser_session_with_headers(base_session_class):
             nav_timeout=None,
         ):
             cdp_session = await self.get_or_create_cdp_session(target_id, focus=False)
+            await apply_playwright_stealth(cdp_session)
             await apply_cdp_request_headers(cdp_session)
             return await super()._navigate_and_wait(
                 url,

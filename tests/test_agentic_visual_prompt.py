@@ -6,8 +6,10 @@ from app import create_app
 from engine.browser_agent import copy_history_screenshots
 from engine.browser_agent.client import (
     apply_cdp_request_headers,
+    apply_playwright_stealth,
     browser_profile_options,
     browser_session_with_headers,
+    playwright_stealth_script,
 )
 from engine.browser_agent.config import (
     BrowserAgentSettings,
@@ -144,11 +146,21 @@ class FakeNetworkCommands:
         self.calls.append(("setExtraHTTPHeaders", params, session_id))
 
 
+class FakePageCommands:
+    def __init__(self):
+        self.calls = []
+
+    async def addScriptToEvaluateOnNewDocument(self, params, session_id):
+        self.calls.append(("addScriptToEvaluateOnNewDocument", params, session_id))
+        return {"identifier": "stealth-script-1"}
+
+
 class FakeCdpSession:
     def __init__(self):
         self.session_id = "cdp-session-1"
         self.network = FakeNetworkCommands()
-        self.cdp_client = SimpleNamespace(send=SimpleNamespace(Network=self.network))
+        self.page = FakePageCommands()
+        self.cdp_client = SimpleNamespace(send=SimpleNamespace(Network=self.network, Page=self.page))
 
 
 def test_apply_cdp_request_headers_sets_user_agent_and_headers():
@@ -172,6 +184,30 @@ def test_apply_cdp_request_headers_sets_user_agent_and_headers():
             {"headers": DEFAULT_BROWSER_HEADERS},
             "cdp-session-1",
         ),
+    ]
+
+
+def test_playwright_stealth_script_uses_mac_browser_overrides():
+    script = playwright_stealth_script()
+
+    assert "navigator.webdriver" in script
+    assert '"navigator_platform": "MacIntel"' in script
+    assert DEFAULT_USER_AGENT in script
+    assert "HeadlessChrome" in script
+
+
+def test_apply_playwright_stealth_adds_init_script_once():
+    cdp_session = FakeCdpSession()
+
+    asyncio.run(apply_playwright_stealth(cdp_session, script="(() => window.__stealth = true)();"))
+    asyncio.run(apply_playwright_stealth(cdp_session, script="(() => window.__stealth = true)();"))
+
+    assert cdp_session.page.calls == [
+        (
+            "addScriptToEvaluateOnNewDocument",
+            {"source": "(() => window.__stealth = true)();", "runImmediately": True},
+            "cdp-session-1",
+        )
     ]
 
 
@@ -211,6 +247,8 @@ def test_browser_session_wrapper_applies_headers_before_navigation():
         ("get_or_create_cdp_session", "target-1", False),
         ("navigate", "https://example.test", "target-1", 3, "domcontentloaded", 5),
     ]
+    assert cdp_session.page.calls[0][0] == "addScriptToEvaluateOnNewDocument"
+    assert cdp_session.page.calls[0][1]["runImmediately"] is True
     assert cdp_session.network.calls[0] == ("enable", "cdp-session-1")
     assert cdp_session.network.calls[1][0] == "setUserAgentOverride"
     assert cdp_session.network.calls[2] == (
