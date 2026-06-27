@@ -1,8 +1,8 @@
-# Ping Submission Automation MVP
+# Ping Submission Automation
 
-Flask MVP for creating ping submission jobs, running Playwright automation, handling CAPTCHA through a manual operator page, writing structured activity logs, and downloading JSON or Markdown reports.
+Flask app for creating ping submission jobs, running autonomous browser-use automation, and downloading final JSON or Markdown reports with success, failure, and reason evidence.
 
-The app is intentionally small: Flask, SQLite, SQLAlchemy, Playwright, and pytest. Jobs run through a plain Python worker entrypoint, without Redis or a queue broker.
+The app is intentionally small: Flask, SQLite, SQLAlchemy, Playwright, and local browser-use. Jobs run through a plain Python worker entrypoint, without Redis or a queue broker.
 
 ## Setup
 
@@ -18,7 +18,7 @@ Open `http://127.0.0.1:5000`.
 
 ## Run a Job
 
-Create a job from the dashboard, then click **Run now** on the job detail page. The page action starts a local background thread and writes progress to the terminal, the job activity panel, and `logs/<job_id>.jsonl`.
+Create a job from the dashboard. The app redirects to the job detail page and starts a local background thread automatically. The **Run now** button remains available as a manual fallback for queued jobs. The browser-use agent takes all browser actions on its own and records progress in the database-backed activity panel.
 
 API flow:
 
@@ -37,31 +37,24 @@ GET /api/jobs/<job_id>/report.json
 GET /api/jobs/<job_id>/report.md
 ```
 
-Generated files are written to `logs/` and `reports/`.
+Generated report files and screenshots are written under `reports/`.
 
-## Test
+## Browser Engine
 
-```bash
-pytest -v
+Browser automation is isolated under `engine/browser_agent/`. The local runner always uses browser-use with a local Chromium profile, real browser-style request headers, and low-volume pacing. It does not use stealth scripts, fingerprint masking, random mouse movement, or fake human activity:
+
+```text
+PLAYWRIGHT_HEADLESS=true
+PLAYWRIGHT_NAVIGATION_TIMEOUT_MS=30000
+PLAYWRIGHT_ACTION_TIMEOUT_MS=10000
+PLAYWRIGHT_SLOW_MO_MS=0
+AGENTIC_MIN_ACTION_DELAY_SECONDS=0.6
+AGENTIC_MAX_ACTION_DELAY_SECONDS=2.0
+AGENTIC_PRE_ATTEMPT_DELAY_SECONDS=1.0
+AGENTIC_MAX_STEPS=80
 ```
 
-For a visible live smoke test against a real external ping site:
-
-```bash
-./scripts/live_flow_test.sh
-```
-
-This creates a job with a random dummy `example.com` URL, starts Flask with
-`PLAYWRIGHT_HEADLESS=false`, opens the local job page in your browser, and shows the external
-ping site in a visible Playwright browser. If port 5000 already has a server, the command starts
-its own visible-browser server on the next open port. It exits successfully only when the report
-says the job is `completed` and every attempt is `success`.
-
-To submit a specific URL:
-
-```bash
-./scripts/live_flow_test.sh https://example.com/my-test-page
-```
+Individual entries in `config/sites.yaml` may set `browser_profile_enabled: true` to reuse an approved profile and `pre_attempt_delay_seconds` to wait longer before opening that service.
 
 ## Cleanup
 

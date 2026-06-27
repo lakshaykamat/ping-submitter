@@ -46,6 +46,8 @@ def sync_sqlite_columns(engine):
         "retry_count": "INTEGER NOT NULL DEFAULT 0",
         "started_at": "DATETIME",
         "finished_at": "DATETIME",
+        "runner_mode": "VARCHAR(40) NOT NULL DEFAULT 'agentic'",
+        "captcha_policy": "VARCHAR(40) NOT NULL DEFAULT 'none'",
     }
     with engine.begin() as connection:
         for column_name, column_type in columns_to_add.items():
@@ -107,6 +109,8 @@ class SubmissionAttempt(Base):
     site_name = Column(String(200), nullable=False)
     submitted_url = Column(Text, nullable=False)
     status = Column(String(40), nullable=False, default="queued")
+    runner_mode = Column(String(40), nullable=False, default="agentic")
+    captcha_policy = Column(String(40), nullable=False, default="none")
     attempt_number = Column(Integer, nullable=False, default=1)
     failure_reason = Column(Text, nullable=True)
     retry_count = Column(Integer, nullable=False, default=0)
@@ -131,6 +135,8 @@ class SubmissionAttempt(Base):
             "site_name": self.site_name,
             "submitted_url": self.submitted_url,
             "status": self.status,
+            "runner_mode": self.runner_mode,
+            "captcha_policy": self.captcha_policy,
             "attempt_number": self.attempt_number,
             "failure_reason": self.failure_reason,
             "retry_count": self.retry_count,
@@ -167,6 +173,60 @@ class CaptchaChallenge(Base):
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
             "expires_at": self.expires_at.isoformat() if self.expires_at else None,
+        }
+
+
+class BrowserProfile(Base):
+    __tablename__ = "browser_profiles"
+
+    id = Column(Integer, primary_key=True)
+    site_id = Column(String(80), nullable=False, index=True)
+    account_label = Column(String(120), nullable=False, default="default")
+    directory_path = Column(Text, nullable=False)
+    approved_for_reuse = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now)
+    last_used_at = Column(DateTime(timezone=True), nullable=True)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "site_id": self.site_id,
+            "account_label": self.account_label,
+            "directory_path": self.directory_path,
+            "approved_for_reuse": bool(self.approved_for_reuse),
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+            "last_used_at": self.last_used_at.isoformat() if self.last_used_at else None,
+        }
+
+
+class SiteMemory(Base):
+    __tablename__ = "site_memories"
+
+    id = Column(Integer, primary_key=True)
+    site_id = Column(String(80), nullable=False, index=True)
+    status = Column(String(40), nullable=False, default="pending")
+    source_attempt_id = Column(Integer, nullable=True, index=True)
+    strategy_json = Column(Text, nullable=False, default="{}")
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now)
+    promoted_at = Column(DateTime(timezone=True), nullable=True)
+
+    @property
+    def strategy(self):
+        return json.loads(self.strategy_json)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "site_id": self.site_id,
+            "status": self.status,
+            "source_attempt_id": self.source_attempt_id,
+            "strategy": self.strategy,
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+            "promoted_at": self.promoted_at.isoformat() if self.promoted_at else None,
         }
 
 

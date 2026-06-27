@@ -3,8 +3,11 @@ import logging
 import sys
 
 import click
+from dotenv import load_dotenv
 from flask import Flask
 from flask.logging import default_handler
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from app.config import Config
 from app.models import init_database
@@ -17,15 +20,15 @@ def create_app(test_config=None):
     if test_config:
         app.config.update(test_config)
 
-    Path(app.config["LOG_DIR"]).mkdir(parents=True, exist_ok=True)
     Path(app.config["REPORT_DIR"]).mkdir(parents=True, exist_ok=True)
+    Path(app.config["ARTIFACT_DIR"]).mkdir(parents=True, exist_ok=True)
+    Path(app.config["BROWSER_PROFILE_DIR"]).mkdir(parents=True, exist_ok=True)
 
     configure_logging(app)
     init_database(app)
     register_routes(app)
     register_cli(app)
     return app
-
 
 def configure_logging(app):
     app.logger.setLevel(logging.INFO)
@@ -43,10 +46,9 @@ def configure_logging(app):
 
 def register_cli(app):
     @app.cli.command("cleanup")
-    @click.option("--days", default=7, show_default=True, help="Delete generated logs and reports older than this many days.")
+    @click.option("--days", default=7, show_default=True, help="Delete generated reports older than this many days.")
     def cleanup(days):
-        removed_count = remove_old_files(Path(app.config["LOG_DIR"]), days)
-        removed_count += remove_old_files(Path(app.config["REPORT_DIR"]), days)
+        removed_count = remove_old_files(Path(app.config["REPORT_DIR"]), days)
         click.echo(f"Removed {removed_count} generated files.")
 
 

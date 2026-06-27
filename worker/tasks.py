@@ -6,7 +6,7 @@ def run_submission_job(job_id, app=None, runner=None):
 
     with app.app_context():
         if runner is None:
-            from automation.runner import AutomationRunner
+            from engine.runner import AutomationRunner
 
             runner = AutomationRunner()
         return runner.run_job(job_id).to_dict(include_attempts=True)

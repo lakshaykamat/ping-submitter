@@ -6,7 +6,7 @@ sites:
   - id: sitesondisplay
     name: Sites On Display
     url: https://www.sitesondisplay.com/add.html
-    enabled: true
+    enabled: false
   - id: indexkings
     name: Index Kings
     url: http://www.indexkings.com/index.php
