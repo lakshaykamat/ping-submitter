@@ -2,7 +2,7 @@ def record_browser_session_event(site, attempt_context, settings):
     context = {
         "backend": "local_browser_use",
         "playwright_headless": settings.headless,
-        "stealth_or_evasion": False,
+        "stealth_or_evasion": True,
         "browser_profile_directory": attempt_context.get("browser_profile_directory"),
     }
 
@@ -35,5 +35,8 @@ def record_screenshot_artifact(attempt_context, screenshot_path, index):
         attempt_id=attempt_context["attempt_id"],
         site_id=attempt_context.get("site_id"),
         submitted_url=attempt_context.get("submitted_url"),
-        context={"stage": f"agent_step_{index:02d}", "screenshot_path": str(screenshot_path)},
+        context={
+            "stage": f"agent_step_{index:02d}",
+            "screenshot_path": str(screenshot_path),
+        },
     )

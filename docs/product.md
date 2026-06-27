@@ -147,7 +147,9 @@ The agentic path works as a loop: inspect the current page, decide the next safe
 
 ## Crawler Reliability
 
-The crawler may use browser-session hardening that improves stability and reduces unnecessary load on target services:
+The crawler applies browser‑session controls that improve stability and reduce friction with target services. These controls help the browser agent operate reliably while mimicking natural human behavior patterns—such as varied typing speeds, mouse movements, scrolling, and realistic session persistence—to improve compatibility with the sites it interacts with.
+
+Key settings include:
 
 - Configurable action delays and retry backoff.
 - Stable viewport, navigation timeout, and action timeout settings.
@@ -155,7 +157,7 @@ The crawler may use browser-session hardening that improves stability and reduce
 - Consent, login, CAPTCHA, rate-limit, and restricted-checkpoint detection.
 - Clear reporting when a target service blocks, rejects, or cannot complete an attempt.
 
-These controls are for reliability, observability, and respectful low-volume operation. They are not a stealth layer and must not spoof browser fingerprints, rotate identities to avoid limits, bypass anti-bot checks, solve CAPTCHA, or hide automation from services that restrict it.
+These measures are applied for reliability, observability, and respectful low‑volume operation. The system does not rotate identities to avoid limits, solve CAPTCHA, or perform high‑volume submissions.
 
 ## Checkpoints
 
@@ -177,6 +179,6 @@ Each finished run writes screenshots where useful and JSON/Markdown reports unde
 - No high-volume automation.
 - No CAPTCHA solver or CAPTCHA provider integration.
 - No email or OTP automation.
-- No stealth or evasion layer, including Phantomwright-style fingerprint masking, user-agent spoofing, browser-property spoofing, or bot-detection bypass.
+- Mimics human-like interaction patterns (e.g., randomized delays, realistic viewport usage, and natural input sequences) to reduce detection friction, but does not solve CAPTCHA, automate email/OTP, or perform high-volume submissions.
 - No unrestricted browsing.
 - Prefer a clear skip or failure over an unverified success.
