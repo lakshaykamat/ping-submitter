@@ -15,6 +15,7 @@ class Config:
     ARTIFACT_DIR = os.environ.get("ARTIFACT_DIR", str(BASE_DIR / "reports" / "artifacts"))
     BROWSER_PROFILE_DIR = os.environ.get("BROWSER_PROFILE_DIR", str(BASE_DIR / "browser_profiles"))
     SITES_CONFIG_PATH = os.environ.get("SITES_CONFIG_PATH", str(BASE_DIR / "config" / "sites.yaml"))
+    SUBMISSION_EMAIL = os.environ.get("SUBMISSION_EMAIL", "")
     CAPTCHA_POLICY_DEFAULT = os.environ.get("CAPTCHA_POLICY_DEFAULT", "solve")
     AGENTIC_PRE_ATTEMPT_DELAY_SECONDS = float(os.environ.get("AGENTIC_PRE_ATTEMPT_DELAY_SECONDS", "1.0"))
     SKYVERN_BASE_URL = os.environ.get("SKYVERN_BASE_URL", "http://localhost:8001")
@@ -22,4 +23,5 @@ class Config:
     SKYVERN_MAX_STEPS = int(os.environ.get("SKYVERN_MAX_STEPS", "50"))
     SKYVERN_POLL_INTERVAL_SECONDS = float(os.environ.get("SKYVERN_POLL_INTERVAL_SECONDS", "5.0"))
     SKYVERN_TASK_TIMEOUT_SECONDS = float(os.environ.get("SKYVERN_TASK_TIMEOUT_SECONDS", "3600.0"))
+    SKYVERN_RECORD_SESSION = os.environ.get("SKYVERN_RECORD_SESSION", "false")
     TESTING = False
