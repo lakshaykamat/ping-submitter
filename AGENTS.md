@@ -2,12 +2,13 @@
 
 ## Project Structure & Module Organization
 
-This repository is a small Flask application for running ping submission jobs through a local browser automation engine.
+This repository is a small Flask application for running ping submission jobs through reusable browser automation packages.
 
 - `app/` contains the Flask app factory, configuration, database models, routes, templates, and service modules.
-- `app/services/` holds application workflows such as jobs, reports, events, profiles, files, and site config access.
-- `engine/` contains browser automation, captcha detection, prompt construction, runner logic, and shared automation types.
-- `worker/` contains background task entrypoints.
+- `app/services/` holds application workflows such as jobs, reports, events, profiles, files, statuses, and site config access.
+- `packages/browser_automation/` contains reusable browser automation, prompt construction, runner logic, result parsing, and automation types.
+- `packages/captcha_solver/` contains reusable CAPTCHA detection helpers.
+- `worker/` contains background task entrypoints and app-specific job execution orchestration.
 - `config/sites.yaml` defines supported submission targets.
 - `tests/` contains pytest tests. Generated reports, screenshots, browser profiles, logs, `.env`, and `app.db` are local artifacts and should stay out of git.
 
@@ -42,7 +43,7 @@ flask --app app:create_app cleanup --days 7
 
 ## Coding Style & Naming Conventions
 
-Use Python 3 with 4-space indentation and clear, descriptive names. Prefer snake_case for functions, variables, modules, and test files. Keep route handlers thin and put business logic in `app/services/` or `engine/` modules. Follow the existing style: small focused modules, explicit dataclasses or typed structures where useful, and minimal comments unless they clarify non-obvious behavior.
+Use Python 3 with 4-space indentation and clear, descriptive names. Prefer snake_case for functions, variables, modules, and test files. Keep route handlers thin and put business logic in `app/services/` or `worker/` modules. Keep reusable automation logic in `packages/` free of Flask, SQLAlchemy, and worker dependencies. Follow the existing style: small focused modules, explicit dataclasses or typed structures where useful, and minimal comments unless they clarify non-obvious behavior.
 
 ## Testing Guidelines
 
@@ -50,7 +51,7 @@ Tests use `pytest` with `pythonpath = .` configured in `pytest.ini`. Name tests 
 
 ## Automation Behavior & Guardrails
 
-The browser automation engine (`engine/`) is designed to **ignore** common anti-bot guardrails (e.g., CAPTCHA challenges, rate‑limiting walls, JavaScript detection) and to **mimic human behavior** as closely as possible. This includes:
+The browser automation package (`packages/browser_automation/`) is designed to handle common anti-bot guardrails (e.g., CAPTCHA challenges, rate‑limiting walls, JavaScript detection) and use realistic browser settings where appropriate. This includes:
 
 - Introducing random delays between keystrokes and mouse movements.
 - Using realistic viewport sizes and scrolling patterns.

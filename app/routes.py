@@ -1,5 +1,3 @@
-from threading import Thread
-
 from flask import jsonify, redirect, render_template, request, send_file, url_for
 
 from app.models import SubmissionJob, get_session
@@ -18,18 +16,6 @@ from app.services import (
     reset_browser_profile,
     status_values,
 )
-from worker.tasks import run_submission_job
-
-
-def start_background_submission_job(app, job_id):
-    thread = Thread(
-        target=run_submission_job,
-        kwargs={"job_id": job_id, "app": app},
-        daemon=True,
-        name=f"submission-job-{job_id}",
-    )
-    thread.start()
-    return thread
 
 
 def register_routes(app):
@@ -78,14 +64,12 @@ def register_routes(app):
                 error=str(error),
                 form_data=payload,
             ), 400
-        start_background_submission_job(app, job.id)
         return redirect(url_for("job_detail", job_id=job.id))
 
     @app.post("/jobs/<job_id>/run")
     def run_job_from_page(job_id):
         if get_job(job_id) is None:
             return render_template("job_detail.html", job=None), 404
-        start_background_submission_job(app, job_id)
         return redirect(url_for("job_detail", job_id=job_id))
 
     @app.get("/jobs/<job_id>")
@@ -152,9 +136,10 @@ def register_routes(app):
 
     @app.post("/api/jobs/<job_id>/run")
     def run_job_now(job_id):
-        if get_job(job_id) is None:
+        job = get_job(job_id)
+        if job is None:
             return jsonify({"error": "job not found"}), 404
-        return jsonify(run_submission_job(job_id, app=app))
+        return jsonify(job.to_dict(include_attempts=True)), 202
 
     @app.get("/api/status-values")
     def api_status_values():

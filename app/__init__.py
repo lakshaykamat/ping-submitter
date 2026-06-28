@@ -51,6 +51,23 @@ def register_cli(app):
         removed_count = remove_old_files(Path(app.config["REPORT_DIR"]), days)
         click.echo(f"Removed {removed_count} generated files.")
 
+    @app.cli.command("worker")
+    @click.option("--once", is_flag=True, help="Run at most one queued job and exit.")
+    @click.option("--poll-interval", default=5.0, show_default=True, help="Seconds to wait between empty polls.")
+    def worker(once, poll_interval):
+        from worker.tasks import SequentialWorker
+
+        submission_worker = SequentialWorker(app=app, poll_interval=poll_interval)
+        if once:
+            result = submission_worker.run_once()
+            if result is None:
+                click.echo("No runnable jobs.")
+            else:
+                click.echo(f"Ran job {result['id']} with status {result['status']}.")
+            return
+
+        submission_worker.run_forever()
+
 
 def remove_old_files(directory, days):
     import time

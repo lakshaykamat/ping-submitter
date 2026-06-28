@@ -16,9 +16,21 @@ flask --app app:create_app run
 
 Open `http://127.0.0.1:5000`.
 
+Run the worker in a separate terminal:
+
+```bash
+flask --app app:create_app worker
+```
+
+For a single pass, use:
+
+```bash
+python -m worker --once
+```
+
 ## Run a Job
 
-Create a job from the dashboard. The app redirects to the job detail page and starts a local background thread automatically. The **Run now** button remains available as a manual fallback for queued jobs. The browser-use agent takes all browser actions on its own and records progress in the database-backed activity panel.
+Create a job from the dashboard. The app redirects to the job detail page and leaves the job queued for the worker. The worker runs one job at a time, and the browser-use agent records progress in the database-backed activity panel.
 
 API flow:
 
@@ -30,6 +42,8 @@ curl -X POST http://127.0.0.1:5000/api/jobs \
 curl -X POST http://127.0.0.1:5000/api/jobs/<job_id>/run
 ```
 
+The run endpoint confirms that the job exists and is queued for worker execution. It does not execute automation inside the web request.
+
 Reports:
 
 ```text
@@ -39,9 +53,15 @@ GET /api/jobs/<job_id>/report.md
 
 Generated report files and screenshots are written under `reports/`.
 
-## Browser Engine
+## Browser Automation
 
-Browser automation is isolated under `engine/browser_agent/`. The local runner uses browser-use with a local Chromium profile, real browser‑style request headers, and low‑volume pacing. To avoid detection and mimic natural human behavior, the engine introduces:
+Reusable browser automation lives under `packages/browser_automation/`. It has no Flask, SQLAlchemy, job, attempt, report, or worker dependencies. The worker uses that package to run browser-use with a local Chromium profile, real browser-style request headers, and low-volume pacing.
+
+Reusable CAPTCHA helpers live under `packages/captcha_solver/`. App-specific CAPTCHA challenge rows and screenshot paths are handled by `app.services.captcha`.
+
+The worker owns job execution: it loads site config, profiles, and memory from app services, calls the reusable browser automation package, then records events, attempt status, and reports.
+
+To avoid detection and mimic natural human behavior, browser automation introduces:
 
 - Random mouse movements and scrolling patterns.
 - Variable typing speeds and pauses between actions.
