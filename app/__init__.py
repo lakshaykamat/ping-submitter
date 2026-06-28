@@ -10,6 +10,7 @@ from app.config import Config
 from app.logging_utils import configure_logging
 from app.models import init_database
 from app.routes import register_routes
+from app.utils.files import remove_old_files
 
 
 def create_app(test_config=None):
@@ -66,19 +67,3 @@ def register_cli(app):
             return
 
         submission_worker.run_forever()
-
-
-def remove_old_files(directory, days):
-    import time
-
-    if not directory.exists():
-        return 0
-    cutoff = time.time() - days * 24 * 60 * 60
-    removed_count = 0
-    for path in directory.iterdir():
-        if path.name == ".gitkeep" or not path.is_file():
-            continue
-        if path.stat().st_mtime < cutoff:
-            path.unlink()
-            removed_count += 1
-    return removed_count

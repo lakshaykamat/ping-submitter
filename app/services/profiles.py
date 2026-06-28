@@ -5,10 +5,11 @@ from pathlib import Path
 from flask import current_app
 
 from app.models import BrowserProfile, SiteMemory, SubmissionAttempt, get_session, utc_now
-from app.services.events import record_event, redact_sensitive_data
+from app.services.events import record_event
 from app.services.exceptions import ValidationError
-from app.services.files import safe_filename
 from app.services.statuses import SITE_MEMORY_STATUSES
+from app.utils.files import safe_filename
+from app.utils.redaction import redact_sensitive_data
 
 
 def get_browser_profiles():

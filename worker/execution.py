@@ -4,6 +4,7 @@ from pathlib import Path
 from flask import current_app
 
 from app.models import SubmissionJob, get_session, utc_now
+from app.lib.agent_results import agent_context, agent_failure_status, agent_reason, failure_reason
 from app.services import (
     approved_site_memory,
     build_report,
@@ -15,11 +16,8 @@ from app.services import (
 )
 from packages.browser_automation import SkyvernRunner, SkyvernSettings
 from packages.browser_automation.types import (
-    AGENT_FAILURE_STATUSES,
     AGENT_SKIP_STATUSES,
     AGENT_SUCCESS,
-    CAPTCHA_AGENT_STATUSES,
-    CAPTCHA_FAILURE_REASON,
 )
 
 
@@ -264,34 +262,6 @@ class AutomationRunner:
             context={"status": job.status},
         )
         write_report(job.id, build_report(job))
-
-
-def agent_context(result):
-    context = {
-        "status": result.status,
-        "confidence": result.confidence,
-        "screenshot_path": result.screenshot_path,
-    }
-    context.update(result.evidence or {})
-    return context
-
-
-def agent_reason(result):
-    evidence = result.evidence or {}
-    return result.message or evidence.get("reason") or evidence.get("failure_reason")
-
-
-def agent_failure_status(status):
-    if status in AGENT_FAILURE_STATUSES:
-        return status
-    return "agent_uncertain"
-
-
-def failure_reason(result, status):
-    if result.status in CAPTCHA_AGENT_STATUSES:
-        return agent_reason(result) or CAPTCHA_FAILURE_REASON
-    return agent_reason(result) or f"Agent returned {status}."
-
 
 def pre_attempt_delay_seconds(site_config):
     site_delay = site_config.get("pre_attempt_delay_seconds")
