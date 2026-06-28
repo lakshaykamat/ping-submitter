@@ -1,5 +1,6 @@
 from app.services.events import record_event
 from app.services.exceptions import ValidationError
+from app.services.captcha import create_captcha_challenge, save_captcha_screenshot
 from app.services.jobs import (
     create_submission_job,
     get_job,
@@ -29,6 +30,7 @@ __all__ = (
     "approved_site_memory",
     "build_report",
     "create_submission_job",
+    "create_captcha_challenge",
     "get_browser_profiles",
     "get_job",
     "get_job_events",
@@ -42,6 +44,7 @@ __all__ = (
     "record_event",
     "record_site_memory",
     "reset_browser_profile",
+    "save_captcha_screenshot",
     "status_values",
     "write_report",
 )

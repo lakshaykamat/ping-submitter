@@ -5,7 +5,7 @@ import re
 from flask import current_app
 
 from app.models import JobEvent, utc_now
-from engine.types import EVENT_TYPES
+from app.services.statuses import EVENT_TYPES
 
 
 def record_event(

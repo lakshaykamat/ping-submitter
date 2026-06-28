@@ -1,21 +1,25 @@
 import time
+from pathlib import Path
 
 from flask import current_app
 
-from engine.browser_agent import BrowserUseAgentRunner
-from engine.types import (
+from app.models import SubmissionJob, get_session, utc_now
+from app.services import (
+    approved_site_memory,
+    build_report,
+    get_or_create_browser_profile,
+    load_sites,
+    record_event,
+    record_site_memory,
+    write_report,
+)
+from packages.browser_automation import BrowserAgentSettings, BrowserUseAgentRunner
+from packages.browser_automation.types import (
     AGENT_FAILURE_STATUSES,
     AGENT_SKIP_STATUSES,
     AGENT_SUCCESS,
     CAPTCHA_AGENT_STATUSES,
     CAPTCHA_FAILURE_REASON,
-)
-from app.models import SubmissionJob, get_session, utc_now
-from app.services import build_report, load_sites, record_event, write_report
-from app.services import (
-    approved_site_memory,
-    get_or_create_browser_profile,
-    record_site_memory,
 )
 
 
@@ -24,9 +28,11 @@ class AutomationRunner:
         self,
         agentic_runner=None,
         sleep=None,
+        browser_settings=None,
     ):
         self.agentic_runner = agentic_runner
         self.sleep = sleep or time.sleep
+        self.browser_settings = browser_settings
 
     def run_job(self, job_id):
         session = get_session()
@@ -95,7 +101,7 @@ class AutomationRunner:
 
         profile = get_or_create_browser_profile(site_config)
         site_memory = approved_site_memory(attempt.site_id)
-        runner = self.agentic_runner or BrowserUseAgentRunner(sleep=self.sleep)
+        runner = self.agentic_runner or self.create_browser_runner()
         result = runner.submit_url(
             site_config,
             attempt.submitted_url,
@@ -110,7 +116,33 @@ class AutomationRunner:
                 "approved_site_memory": site_memory,
             },
         )
+        self.record_artifact_events(job, attempt, result)
         self.apply_agent_result(job, attempt, result)
+
+    def create_browser_runner(self):
+        return BrowserUseAgentRunner(
+            sleep=self.sleep,
+            settings=self.browser_settings or BrowserAgentSettings.from_mapping(current_app.config),
+            session_event_recorder=record_browser_session_event,
+        )
+
+    def record_artifact_events(self, job, attempt, result):
+        evidence = result.evidence or {}
+        artifact_paths = copied_artifact_paths(evidence.get("screenshot_paths") or [])
+        for index, screenshot_path in enumerate(artifact_paths, start=1):
+            record_event(
+                get_session(),
+                job.id,
+                "artifact_saved",
+                f"Saved agent visual observation {index}.",
+                attempt_id=attempt.id,
+                site_id=attempt.site_id,
+                submitted_url=attempt.submitted_url,
+                context={
+                    "stage": f"agent_step_{index:02d}",
+                    "screenshot_path": str(screenshot_path),
+                },
+            )
 
     def wait_before_attempt(self, job, attempt, site_config):
         delay_seconds = pre_attempt_delay_seconds(site_config)
@@ -259,6 +291,38 @@ class AutomationRunner:
             context={"status": job.status},
         )
         write_report(job.id, build_report(job))
+
+
+def record_browser_session_event(site, attempt_context, settings):
+    context = {
+        "backend": "local_browser_use",
+        "playwright_headless": settings.headless,
+        "stealth_or_evasion": True,
+        "browser_profile_directory": attempt_context.get("browser_profile_directory"),
+    }
+
+    db_session = get_session()
+    record_event(
+        db_session,
+        attempt_context["job_id"],
+        "agent_checkpoint",
+        "Local Browser Use agent started.",
+        attempt_id=attempt_context["attempt_id"],
+        site_id=site.get("id"),
+        submitted_url=attempt_context.get("submitted_url"),
+        context=context,
+    )
+    db_session.commit()
+
+
+def copied_artifact_paths(paths):
+    artifact_dir = Path(current_app.config["ARTIFACT_DIR"]).resolve()
+    copied_paths = []
+    for path in paths:
+        resolved_path = Path(path).resolve()
+        if resolved_path == artifact_dir or artifact_dir in resolved_path.parents:
+            copied_paths.append(str(path))
+    return copied_paths
 
 
 def agent_context(result):

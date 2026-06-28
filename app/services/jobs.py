@@ -4,8 +4,8 @@ from urllib.parse import urlparse
 from app.models import JobEvent, SubmissionAttempt, SubmissionJob, get_session
 from app.services.events import record_event
 from app.services.exceptions import ValidationError
+from app.services.statuses import ATTEMPT_STATUSES, JOB_STATUSES
 from app.services.sites import load_sites
-from engine.types import ATTEMPT_STATUSES, JOB_STATUSES
 
 
 def create_submission_job(payload):

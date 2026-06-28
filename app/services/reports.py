@@ -1,4 +1,5 @@
 import json
+from datetime import timezone
 from pathlib import Path
 
 from flask import current_app
@@ -293,4 +294,12 @@ def job_finish_time(job):
 def duration_seconds(started_time, finished_time):
     if not started_time or not finished_time:
         return None
+    started_time = utc_comparable_datetime(started_time)
+    finished_time = utc_comparable_datetime(finished_time)
     return round((finished_time - started_time).total_seconds(), 3)
+
+
+def utc_comparable_datetime(value):
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)

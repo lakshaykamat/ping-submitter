@@ -8,7 +8,7 @@ from app.models import BrowserProfile, SiteMemory, SubmissionAttempt, get_sessio
 from app.services.events import record_event, redact_sensitive_data
 from app.services.exceptions import ValidationError
 from app.services.files import safe_filename
-from engine.types import SITE_MEMORY_STATUSES
+from app.services.statuses import SITE_MEMORY_STATUSES
 
 
 def get_browser_profiles():

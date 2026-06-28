@@ -3,22 +3,22 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from app import create_app
-from engine.browser_agent import copy_history_screenshots
-from engine.browser_agent.client import (
+from packages.browser_automation import copy_history_screenshots
+from packages.browser_automation.client import (
     apply_cdp_request_headers,
     apply_playwright_stealth,
     browser_profile_options,
     browser_session_with_headers,
     playwright_stealth_script,
 )
-from engine.browser_agent.config import (
+from packages.browser_automation.config import (
     BrowserAgentSettings,
     DEFAULT_BROWSER_ARGS,
     DEFAULT_BROWSER_HEADERS,
     DEFAULT_USER_AGENT,
     DEFAULT_VIEWPORT,
 )
-from engine.prompts import build_agent_task, target_url_context
+from packages.browser_automation.prompts import build_agent_task, target_url_context
 
 
 class FakeHistory:
@@ -60,12 +60,44 @@ def test_agent_task_requires_visual_url_prefix_handling():
         max_delay=2.0,
     )
 
-    assert "Use the screenshot/visual state first" in task
-    assert "Make exactly one browser action at a time" in task
+    assert "Use the screenshot first" in task
+    assert "Take one browser action, observe" in task
     assert "target_url.without_scheme" in task
-    assert "https://https://" in task
     assert '"without_scheme": "example.com"' in task
-    assert "Fill required companion fields" in task
+    assert "composed value must equal the target URL exactly once" in task
+    assert "For blog/site/title/name fields" in task
+
+
+def test_agent_task_allows_clear_and_replace_for_existing_field_values():
+    task = build_agent_task(
+        site={"url": "https://pingomatic.com/"},
+        submitted_url="https://example.com",
+        attempt_context={},
+        min_delay=0.6,
+        max_delay=2.0,
+    )
+
+    assert "input text with clear=True" in task
+    assert "send keys such as select-all, Backspace, Delete, Enter" in task
+    assert "use input with clear=True and the full replacement value" in task
+    assert "If the field still has the wrong value" in task
+    assert "select-all, Backspace/Delete" in task
+    assert "type the exact value once" in task
+
+
+def test_agent_task_allows_scrolling_to_find_hidden_forms():
+    task = build_agent_task(
+        site={"url": "https://pingomatic.com/"},
+        submitted_url="https://example.com",
+        attempt_context={},
+        min_delay=0.6,
+        max_delay=2.0,
+    )
+
+    assert "scroll down/up" in task
+    assert "If the form or submit controls are not visible" in task
+    assert "scroll down in useful increments" in task
+    assert "scroll back up and inspect earlier sections" in task
 
 
 def test_copy_history_screenshots_deduplicates_and_records_events(tmp_path):

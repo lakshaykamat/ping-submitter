@@ -1,9 +1,9 @@
 from datetime import timedelta
-from pathlib import Path
 
 from flask import current_app
 
 from app.models import CaptchaChallenge, get_session, utc_now
+from packages.captcha_solver import save_captcha_screenshot as save_package_captcha_screenshot
 
 
 def create_captcha_challenge(job, attempt, page, wait_seconds):
@@ -22,7 +22,4 @@ def create_captcha_challenge(job, attempt, page, wait_seconds):
 
 
 def save_captcha_screenshot(job_id, attempt_id, page):
-    path = Path(current_app.config["ARTIFACT_DIR"]) / str(job_id) / str(attempt_id) / "captcha.png"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    page.screenshot(path=str(path), full_page=True)
-    return path
+    return save_package_captcha_screenshot(job_id, attempt_id, page, current_app.config["ARTIFACT_DIR"])

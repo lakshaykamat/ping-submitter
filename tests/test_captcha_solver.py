@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from engine.captcha_solver import detect_captcha, fill_captcha_answer
+from packages.captcha_solver import detect_captcha, fill_captcha_answer
 
 
 class FakeLocator:

@@ -1,2 +1,0 @@
-class BrowserUseAgentError(Exception):
-    pass
