@@ -2,8 +2,22 @@ import re
 from urllib.parse import urlparse
 
 
-def build_prompt(site, submitted_url):
+def build_agent_goal():
+    return "\n".join([
+        "You are a URL submission agent for web ping and indexing services.",
+        "Each run provides a specific URL to submit and instructions for the target service.",
+        "Follow the run instructions exactly: fill in the form, handle any CAPTCHA, and confirm success.",
+    ])
+
+
+def build_run_goal(site, submitted_url):
     target = _parse_url(submitted_url)
+    email = site.get("submission_email") or ""
+    email_instruction = (
+        f'- Email fields: always enter "{email}" in any email input on the page.'
+        if email
+        else "- Email fields: leave empty."
+    )
     return "\n".join([
         f"Submit the URL {submitted_url} using the submission form on this page.",
         "",
@@ -17,8 +31,13 @@ def build_prompt(site, submitted_url):
         "",
         "Other fields:",
         f'- Name / title / blog name fields: use "{target["default_title"]}"',
-        "- Email fields: leave empty unless required.",
+        email_instruction,
         "- Any other optional fields: leave empty.",
+        "",
+        "CAPTCHA handling:",
+        '- If a checkbox labelled "Verify I\'m human", "I\'m not a robot", or similar appears, click it before submitting.',
+        "- If a reCAPTCHA or hCAPTCHA widget is present, attempt to solve or tick it before submitting.",
+        "- Do not proceed to submit until any CAPTCHA on the page has been completed.",
         "",
         "After submitting, wait for the page to show a success message or confirmation.",
         "Return success only when the page visibly confirms the submission was accepted.",

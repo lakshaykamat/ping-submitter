@@ -1,6 +1,6 @@
 import pytest
 
-from packages.browser_automation.prompts import _default_title, _parse_url, build_prompt
+from packages.browser_automation.prompts import _default_title, _parse_url, build_run_goal as build_prompt
 from packages.browser_automation.results import parse_skyvern_result
 from packages.browser_automation.types import AgentResult
 

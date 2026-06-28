@@ -20,7 +20,10 @@ def parse_skyvern_result(task):
 
     status = _map_status(skyvern_status, failure_reason)
     message = _build_message(skyvern_status, failure_reason, status)
-    evidence = {"skyvern_run_id": task.get("run_id"), "skyvern_status": skyvern_status}
+    evidence = {
+        "skyvern_run_id": task.get("run_id"),
+        "skyvern_status": skyvern_status,
+    }
     if failure_reason:
         evidence["reason"] = failure_reason
 
