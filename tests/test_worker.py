@@ -58,6 +58,15 @@ class CaptchaFailedAgentRunner:
         )
 
 
+class SuccessfulAgentRunnerWithMissingScreenshot:
+    def submit_url(self, site_config, submitted_url, attempt_context):
+        return AgentResult(
+            status="success",
+            message="Submitted.",
+            evidence={"screenshot_paths": [None]},
+        )
+
+
 def test_run_once_runs_oldest_runnable_job(app):
     with app.app_context():
         first_job = create_test_job("https://example.com/first")
@@ -116,3 +125,19 @@ def test_automation_runner_preserves_captcha_failure_status(app):
         assert failed_job.status == "failed"
         assert attempt.status == "captcha_failed"
         assert attempt.failure_reason == "CAPTCHA solver failed."
+
+
+def test_automation_runner_ignores_empty_screenshot_paths(app):
+    with app.app_context():
+        job = create_test_job("https://example.com/success")
+
+        AutomationRunner(
+            agentic_runner=SuccessfulAgentRunnerWithMissingScreenshot(),
+            sleep=lambda seconds: None,
+        ).run_job(job.id)
+
+        completed_job = get_session().get(SubmissionJob, job.id)
+        attempt = completed_job.attempts[0]
+
+        assert completed_job.status == "completed"
+        assert attempt.status == "success"

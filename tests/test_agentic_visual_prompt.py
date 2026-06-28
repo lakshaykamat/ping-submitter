@@ -2,6 +2,8 @@ import asyncio
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from app import create_app
 from packages.browser_automation import copy_history_screenshots
 from packages.browser_automation.client import (
@@ -21,7 +23,12 @@ from packages.browser_automation.config import (
     DEFAULT_VIEWPORT,
     detected_screen_size,
 )
-from packages.browser_automation.prompts import build_agent_task, target_url_context
+from packages.browser_automation.prompts import (
+    accepted_url_value_context,
+    build_agent_task,
+    target_url_context,
+)
+from packages.browser_automation.types import AGENT_BROWSER_TOOLS
 from packages.captcha_solver import (
     CaptchaSolveResult,
     CaptchaTask,
@@ -56,7 +63,61 @@ def test_target_url_context_includes_without_scheme():
     assert context["scheme"] == "https"
     assert context["without_scheme"] == "example.com/path?a=1#top"
     assert context["hostname"] == "example.com"
-    assert context["default_title"] == "example.com"
+    assert context["default_title"] == "Example"
+
+
+@pytest.mark.parametrize(
+    ("submitted_url", "hostname", "without_scheme", "default_title"),
+    [
+        ("https://example.com", "example.com", "example.com", "Example"),
+        ("http://example.com", "example.com", "example.com", "Example"),
+        ("https://www.example.com/path", "www.example.com", "www.example.com/path", "Example"),
+        (
+            "https://my-example-site.com:8443/a/b?x=1#top",
+            "my-example-site.com",
+            "my-example-site.com:8443/a/b?x=1#top",
+            "My Example Site",
+        ),
+        ("https://blog.company-name.io", "blog.company-name.io", "blog.company-name.io", "Company Name"),
+        ("https://www.example.co.uk/path", "www.example.co.uk", "www.example.co.uk/path", "Example"),
+        ("https://service.example.com.au", "service.example.com.au", "service.example.com.au", "Example"),
+        ("https://localhost:5000/ping", "localhost", "localhost:5000/ping", "Localhost"),
+        ("https://127.0.0.1:5000/ping", "127.0.0.1", "127.0.0.1:5000/ping", "Submitted URL"),
+    ],
+)
+def test_target_url_context_derives_safe_form_values(
+    submitted_url,
+    hostname,
+    without_scheme,
+    default_title,
+):
+    context = target_url_context(submitted_url)
+
+    assert context["full"] == submitted_url
+    assert context["hostname"] == hostname
+    assert context["without_scheme"] == without_scheme
+    assert context["default_title"] == default_title
+
+
+@pytest.mark.parametrize(
+    ("submitted_url", "accepted_values"),
+    [
+        ("https://example.com", ["https://example.com", "http://example.com"]),
+        ("http://example.com", ["http://example.com", "https://example.com"]),
+        (
+            "https://example.com/path?a=1#top",
+            ["https://example.com/path?a=1#top", "http://example.com/path?a=1#top"],
+        ),
+        (
+            "https://my-example-site.com:8443/a/b",
+            ["https://my-example-site.com:8443/a/b", "http://my-example-site.com:8443/a/b"],
+        ),
+    ],
+)
+def test_accepted_url_values_are_exact_scheme_variants(submitted_url, accepted_values):
+    context = target_url_context(submitted_url)
+
+    assert accepted_url_value_context(context) == accepted_values
 
 
 def test_agent_task_requires_visual_url_prefix_handling():
@@ -73,12 +134,68 @@ def test_agent_task_requires_visual_url_prefix_handling():
     assert "target_url.without_scheme" in task
     assert '"without_scheme": "example.com"' in task
     assert "Accepted final URL field values" in task
-    assert "first decide whether any http:// or https:// prefix is editable text inside the input or an uneditable label" in task
-    assert "preserve that prefix" in task
-    assert "must be one of the accepted final URL field values, with exactly one scheme prefix" in task
+    assert "URL fields: inspect the current editable value and nearby fixed prefix before typing" in task
+    assert "If the editable value is exactly http:// or https://" in task
+    assert "type only target_url.without_scheme once" in task
+    assert "Do not append to any existing domain, path, or partial URL" in task
+    assert "must equal one accepted final URL value with one scheme only" in task
     assert "http:/example.com" in task
     assert "http://http://example.com" in task
+    assert "example.comexample.com" in task
     assert "For blog/site/title/name fields" in task
+    assert "use target_url.default_title, not target_url.hostname or target_url.without_scheme" in task
+    assert "For email fields, leave empty unless required and no approved email is available" in task
+    assert "Never fill every text field with the URL, hostname, or example.com" in task
+
+
+def test_agent_task_embeds_readable_title_not_domain_for_non_url_fields():
+    task = build_agent_task(
+        site={"url": "https://service.test/"},
+        submitted_url="https://my-example-site.com/path",
+        attempt_context={},
+        min_delay=0.6,
+        max_delay=2.0,
+    )
+
+    assert '"default_title": "My Example Site"' in task
+    assert '"hostname": "my-example-site.com"' in task
+    assert '"without_scheme": "my-example-site.com/path"' in task
+    assert "For blog/site/title/name fields, use target_url.default_title" in task
+    assert "Never fill every text field with the URL, hostname, or example.com" in task
+
+
+def test_agent_task_lists_every_browser_tool_for_form_access_and_rewriting():
+    task = build_agent_task(
+        site={"url": "https://service.test/"},
+        submitted_url="https://example.com",
+        attempt_context={},
+        min_delay=0.6,
+        max_delay=2.0,
+    )
+
+    for tool_name in AGENT_BROWSER_TOOLS:
+        assert tool_name in task
+
+
+def test_agent_task_exposes_approved_memory_but_redacts_sensitive_context():
+    task = build_agent_task(
+        site={"url": "https://service.test/"},
+        submitted_url="https://example.com",
+        attempt_context={
+            "approved_site_memory": [{"email": "approved@example.test", "name": "Approved User"}],
+            "api_key": "secret-key",
+            "session_token": "secret-token",
+            "site_note": "safe note",
+        },
+        min_delay=0.6,
+        max_delay=2.0,
+    )
+
+    assert "approved@example.test" in task
+    assert "Approved User" in task
+    assert "safe note" in task
+    assert "secret-key" not in task
+    assert "secret-token" not in task
 
 
 def test_agent_task_keeps_clear_and_replace_for_non_url_field_values():
@@ -91,10 +208,10 @@ def test_agent_task_keeps_clear_and_replace_for_non_url_field_values():
     )
 
     assert "input text with clear=True" in task
+    assert "inspect DOM/input values" in task
     assert "send keys such as select-all, Backspace, Delete, Enter" in task
-    assert "When replacing text in non-URL fields" in task
-    assert "use input with clear=True and the full replacement value" in task
-    assert "If the field still has the wrong value" in task
+    assert "Text fields: use input with clear=True" in task
+    assert "If wrong text remains" in task
     assert "select-all, Backspace/Delete" in task
     assert "type the exact value once" in task
 
@@ -108,8 +225,8 @@ def test_agent_task_requires_review_before_submit_and_visible_success_after_subm
         max_delay=2.0,
     )
 
-    assert "review whether that action produced the expected visible result" in task
-    assert "Before clicking a submit control on any page, review required fields one more time" in task
+    assert "verify the visible result" in task
+    assert "Before clicking submit, review required fields once more" in task
     assert "After submit, wait for navigation, redirect, or an in-page update to settle" in task
     assert "Return status success only when the current page visibly confirms acceptance" in task
     assert "If clicking submit leaves you on the same form with no visible confirmation" in task

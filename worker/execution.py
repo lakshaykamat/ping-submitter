@@ -322,6 +322,8 @@ def copied_artifact_paths(paths):
     artifact_dir = Path(current_app.config["ARTIFACT_DIR"]).resolve()
     copied_paths = []
     for path in paths:
+        if not path:
+            continue
         resolved_path = Path(path).resolve()
         if resolved_path == artifact_dir or artifact_dir in resolved_path.parents:
             copied_paths.append(str(path))

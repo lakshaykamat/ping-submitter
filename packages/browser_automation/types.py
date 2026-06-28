@@ -32,6 +32,7 @@ AGENT_REDACTED_CONTEXT_KEY_TERMS = ("key", "secret", "token")
 AGENT_BROWSER_TOOLS = (
     "navigate",
     "click",
+    "inspect DOM/input values",
     "input text with clear=True",
     "send keys such as select-all, Backspace, Delete, Enter",
     "scroll down/up",
