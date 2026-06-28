@@ -13,7 +13,7 @@ from app.services import (
     record_site_memory,
     write_report,
 )
-from packages.browser_automation import BrowserAgentSettings, BrowserUseAgentRunner
+from packages.browser_automation import SkyvernRunner, SkyvernSettings
 from packages.browser_automation.types import (
     AGENT_FAILURE_STATUSES,
     AGENT_SKIP_STATUSES,
@@ -24,15 +24,10 @@ from packages.browser_automation.types import (
 
 
 class AutomationRunner:
-    def __init__(
-        self,
-        agentic_runner=None,
-        sleep=None,
-        browser_settings=None,
-    ):
+    def __init__(self, agentic_runner=None, sleep=None, settings=None):
         self.agentic_runner = agentic_runner
         self.sleep = sleep or time.sleep
-        self.browser_settings = browser_settings
+        self.settings = settings
 
     def run_job(self, job_id):
         session = get_session()
@@ -55,18 +50,18 @@ class AutomationRunner:
 
     def run_attempt(self, job, attempt):
         site_config = self.site_config(attempt.site_id)
-        attempt.runner_mode = "agentic"
+        attempt.runner_mode = "skyvern"
         attempt.captcha_policy = site_config.get(
             "captcha_policy",
             attempt.captcha_policy or current_app.config["CAPTCHA_POLICY_DEFAULT"],
         )
-        site_config["runner_mode"] = "agentic"
+        site_config["runner_mode"] = "skyvern"
         site_config["captcha_policy"] = attempt.captcha_policy
 
         try:
-            self.run_agentic_attempt(job, attempt, site_config)
+            self.run_skyvern_attempt(job, attempt, site_config)
         except Exception as error:
-            self.fail_attempt(job, attempt, "failed", f"Agentic browser runner failed: {error}")
+            self.fail_attempt(job, attempt, "failed", f"Skyvern runner failed: {error}")
 
     def site_config(self, site_id):
         site = load_sites().get(site_id)
@@ -75,12 +70,12 @@ class AutomationRunner:
                 "id": site_id,
                 "name": site_id,
                 "url": "",
-                "runner_mode": "agentic",
+                "runner_mode": "skyvern",
                 "captcha_policy": current_app.config["CAPTCHA_POLICY_DEFAULT"],
             }
         return site
 
-    def run_agentic_attempt(self, job, attempt, site_config, fallback_reason=None):
+    def run_skyvern_attempt(self, job, attempt, site_config):
         session = get_session()
         attempt.status = "running"
         attempt.started_at = attempt.started_at or utc_now()
@@ -88,15 +83,11 @@ class AutomationRunner:
             session,
             job.id,
             "agent_started",
-            "Agentic browser runner started.",
+            "Skyvern agent started.",
             attempt_id=attempt.id,
             site_id=attempt.site_id,
             submitted_url=attempt.submitted_url,
-            context={
-                "runner_mode": attempt.runner_mode,
-                "captcha_policy": attempt.captcha_policy,
-                "fallback_reason": fallback_reason,
-            },
+            context={"runner_mode": attempt.runner_mode, "captcha_policy": attempt.captcha_policy},
         )
         session.commit()
 
@@ -104,7 +95,7 @@ class AutomationRunner:
 
         profile = get_or_create_browser_profile(site_config)
         site_memory = approved_site_memory(attempt.site_id)
-        runner = self.agentic_runner or self.create_browser_runner()
+        runner = self.agentic_runner or self.create_runner()
         result = runner.submit_url(
             site_config,
             attempt.submitted_url,
@@ -114,38 +105,17 @@ class AutomationRunner:
                 "site_id": attempt.site_id,
                 "submitted_url": attempt.submitted_url,
                 "captcha_policy": attempt.captcha_policy,
-                "fallback_reason": fallback_reason,
                 "browser_profile_directory": profile.directory_path if profile else None,
                 "approved_site_memory": site_memory,
             },
         )
-        self.record_artifact_events(job, attempt, result)
         self.apply_agent_result(job, attempt, result)
 
-    def create_browser_runner(self):
-        return BrowserUseAgentRunner(
+    def create_runner(self):
+        return SkyvernRunner(
             sleep=self.sleep,
-            settings=self.browser_settings or BrowserAgentSettings.from_mapping(current_app.config),
-            session_event_recorder=record_browser_session_event,
+            settings=self.settings or SkyvernSettings.from_mapping(current_app.config),
         )
-
-    def record_artifact_events(self, job, attempt, result):
-        evidence = result.evidence or {}
-        artifact_paths = copied_artifact_paths(evidence.get("screenshot_paths") or [])
-        for index, screenshot_path in enumerate(artifact_paths, start=1):
-            record_event(
-                get_session(),
-                job.id,
-                "artifact_saved",
-                f"Saved agent visual observation {index}.",
-                attempt_id=attempt.id,
-                site_id=attempt.site_id,
-                submitted_url=attempt.submitted_url,
-                context={
-                    "stage": f"agent_step_{index:02d}",
-                    "screenshot_path": str(screenshot_path),
-                },
-            )
 
     def wait_before_attempt(self, job, attempt, site_config):
         delay_seconds = pre_attempt_delay_seconds(site_config)
@@ -171,7 +141,7 @@ class AutomationRunner:
                 get_session(),
                 job.id,
                 "agent_success",
-                result.message or "Agentic browser runner completed successfully.",
+                result.message or "Skyvern completed successfully.",
                 attempt_id=attempt.id,
                 site_id=attempt.site_id,
                 submitted_url=attempt.submitted_url,
@@ -190,7 +160,7 @@ class AutomationRunner:
             get_session(),
             job.id,
             "agent_failed",
-            result.message or "Agentic browser runner stopped.",
+            result.message or "Skyvern agent stopped.",
             level="warning",
             attempt_id=attempt.id,
             site_id=attempt.site_id,
@@ -294,40 +264,6 @@ class AutomationRunner:
             context={"status": job.status},
         )
         write_report(job.id, build_report(job))
-
-
-def record_browser_session_event(site, attempt_context, settings):
-    context = {
-        "backend": "local_browser_use",
-        "playwright_headless": settings.headless,
-        "stealth_or_evasion": True,
-        "browser_profile_directory": attempt_context.get("browser_profile_directory"),
-    }
-
-    db_session = get_session()
-    record_event(
-        db_session,
-        attempt_context["job_id"],
-        "agent_checkpoint",
-        "Local Browser Use agent started.",
-        attempt_id=attempt_context["attempt_id"],
-        site_id=site.get("id"),
-        submitted_url=attempt_context.get("submitted_url"),
-        context=context,
-    )
-    db_session.commit()
-
-
-def copied_artifact_paths(paths):
-    artifact_dir = Path(current_app.config["ARTIFACT_DIR"]).resolve()
-    copied_paths = []
-    for path in paths:
-        if not path:
-            continue
-        resolved_path = Path(path).resolve()
-        if resolved_path == artifact_dir or artifact_dir in resolved_path.parents:
-            copied_paths.append(str(path))
-    return copied_paths
 
 
 def agent_context(result):

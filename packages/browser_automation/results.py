@@ -1,87 +1,63 @@
-import json
-
-from packages.browser_automation.types import AgentResult
+from packages.browser_automation.types import AgentResult, CAPTCHA_FAILURE_REASON
 
 
-def result_with_history_metadata(history, attempt_context=None, artifact_recorder=None):
-    output = history.final_result() if hasattr(history, "final_result") else None
-    if isinstance(output, dict):
-        data = dict(output)
-    elif output:
-        data = parse_json_result(str(output))
-    else:
-        data = {
-            "status": "agent_uncertain",
-            "message": "Local Browser Use agent ended without a final result.",
-            "evidence": {},
-        }
+_SKYVERN_STATUS_MAP = {
+    "completed": "success",
+    "canceled": "skipped",
+}
 
-    evidence = data.get("evidence") or {}
-    evidence.update(browser_history_metadata(history))
-    if artifact_recorder:
-        artifact_paths = artifact_recorder(history, attempt_context or {})
-        if artifact_paths:
-            evidence["screenshot_paths"] = artifact_paths
-            data["screenshot_path"] = artifact_paths[-1]
-    data["evidence"] = evidence
-    return data
+_FAILURE_REASON_KEYWORDS = [
+    (("captcha", "recaptcha"), "captcha_failed"),
+    (("login required", "sign in", "signin", "authentication required"), "login_required"),
+    (("rate limit", "too many requests", "access denied", "forbidden", "blocked", "cloudflare", "just a moment"), "restricted_checkpoint"),
+    (("payment", "subscribe", "sign up", "signup", "email verification", "otp"), "skipped"),
+]
 
 
-def browser_history_metadata(history):
-    def call_history_method(name, default):
-        method = getattr(history, name, None)
-        if not callable(method):
-            return default
-        value = method()
-        return default if value is None else value
+def parse_skyvern_result(task):
+    skyvern_status = task.get("status", "")
+    failure_reason = task.get("failure_reason") or ""
 
-    return {
-        "browser_use_backend": "local",
-        "browser_use_is_done": call_history_method("is_done", None),
-        "browser_use_is_successful": call_history_method("is_successful", None),
-        "browser_use_steps": call_history_method("number_of_steps", None),
-        "browser_use_urls": call_history_method("urls", []),
-        "screenshot_paths": call_history_method("screenshot_paths", []),
-    }
+    status = _map_status(skyvern_status, failure_reason)
+    message = _build_message(skyvern_status, failure_reason, status)
+    evidence = {"skyvern_run_id": task.get("run_id"), "skyvern_status": skyvern_status}
+    if failure_reason:
+        evidence["reason"] = failure_reason
+
+    screenshot_urls = task.get("screenshot_urls") or []
+    screenshot_path = screenshot_urls[0] if screenshot_urls else None
+
+    return AgentResult(status=status, message=message, evidence=evidence, screenshot_path=screenshot_path)
 
 
-def parse_agent_result(raw_result):
-    if isinstance(raw_result, AgentResult):
-        return raw_result
-    if isinstance(raw_result, dict):
-        data = raw_result
-    else:
-        data = parse_json_result(str(raw_result))
+def _map_status(skyvern_status, failure_reason):
+    if skyvern_status in _SKYVERN_STATUS_MAP:
+        return _SKYVERN_STATUS_MAP[skyvern_status]
 
-    return AgentResult(
-        status=data.get("status", "agent_uncertain"),
-        message=data.get("message", ""),
-        confidence=data.get("confidence"),
-        evidence=data.get("evidence") or {},
-        screenshot_path=data.get("screenshot_path"),
-    )
+    if skyvern_status == "timed_out":
+        return "failed"
+
+    if skyvern_status in ("failed", "terminated"):
+        return _classify_failure(failure_reason)
+
+    return "agent_uncertain"
 
 
-def parse_json_result(value):
-    normalized = strip_json_markdown(value)
-    try:
-        return json.loads(normalized)
-    except json.JSONDecodeError:
-        return {
-            "status": "agent_uncertain",
-            "message": value,
-            "evidence": {},
-        }
+def _classify_failure(reason):
+    lower = reason.lower()
+    for keywords, status in _FAILURE_REASON_KEYWORDS:
+        if any(kw in lower for kw in keywords):
+            return status
+    return "failed"
 
 
-def strip_json_markdown(value):
-    stripped = str(value).strip()
-    if not stripped.startswith("```"):
-        return stripped
-
-    lines = stripped.splitlines()
-    if lines and lines[0].startswith("```"):
-        lines = lines[1:]
-    if lines and lines[-1].strip() == "```":
-        lines = lines[:-1]
-    return "\n".join(lines).strip()
+def _build_message(skyvern_status, failure_reason, mapped_status):
+    if mapped_status == "success":
+        return "Skyvern completed the submission successfully."
+    if skyvern_status == "timed_out":
+        return "Skyvern task timed out before completing."
+    if mapped_status == "captcha_failed":
+        return failure_reason or CAPTCHA_FAILURE_REASON
+    if failure_reason:
+        return failure_reason
+    return f"Skyvern task ended with status: {skyvern_status}."
