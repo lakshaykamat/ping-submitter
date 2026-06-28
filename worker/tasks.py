@@ -41,16 +41,29 @@ class SequentialWorker:
     def run_once(self):
         job = next_runnable_job()
         if job is None:
+            logger.debug("No runnable job found.", extra={"event": "worker_idle"})
             return None
 
-        logger.info("Running submission job %s", job.id)
+        logger.info("Running submission job.", extra={"event": "job_run_started", "job_id": job.id})
         try:
-            return run_submission_job(job.id, app=self.app, runner=self.runner)
+            result = run_submission_job(job.id, app=self.app, runner=self.runner)
+            logger.info(
+                "Submission job finished.",
+                extra={"event": "job_run_finished", "job_id": job.id, "status": result["status"]},
+            )
+            return result
         except Exception as error:
-            logger.exception("Submission job %s failed in worker", job.id)
+            logger.exception(
+                "Submission job failed in worker.",
+                extra={"event": "job_run_error", "job_id": job.id, "error": str(error)},
+            )
             return mark_job_failed(job.id, error)
 
     def run_forever(self):
+        logger.info(
+            "Worker loop started.",
+            extra={"event": "worker_started", "poll_interval": self.poll_interval},
+        )
         while True:
             result = self.run_once()
             if result is None:

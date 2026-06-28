@@ -6,6 +6,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 class Config:
+    LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev")
     DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{BASE_DIR / 'app.db'}")
     REPORT_DIR = os.environ.get("REPORT_DIR", str(BASE_DIR / "reports"))

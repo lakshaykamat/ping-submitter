@@ -1,15 +1,13 @@
 from pathlib import Path
-import logging
-import sys
 
 import click
 from dotenv import load_dotenv
 from flask import Flask
-from flask.logging import default_handler
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from app.config import Config
+from app.logging_utils import configure_logging
 from app.models import init_database
 from app.routes import register_routes
 
@@ -28,20 +26,17 @@ def create_app(test_config=None):
     init_database(app)
     register_routes(app)
     register_cli(app)
+    app.logger.info(
+        "Application configured.",
+        extra={
+            "event": "server_configured",
+            "database_url": app.config["DATABASE_URL"],
+            "sites_config_path": app.config["SITES_CONFIG_PATH"],
+            "log_level": app.config["LOG_LEVEL"],
+            "testing": app.config["TESTING"],
+        },
+    )
     return app
-
-def configure_logging(app):
-    app.logger.setLevel(logging.INFO)
-    if default_handler in app.logger.handlers:
-        app.logger.removeHandler(default_handler)
-    if any(getattr(handler, "name", None) == "ping-mvp-cli" for handler in app.logger.handlers):
-        return
-
-    handler = logging.StreamHandler(sys.stdout)
-    handler.name = "ping-mvp-cli"
-    handler.setLevel(logging.INFO)
-    handler.setFormatter(logging.Formatter("[%(asctime)s] %(levelname)s %(message)s"))
-    app.logger.addHandler(handler)
 
 
 def register_cli(app):
@@ -57,6 +52,10 @@ def register_cli(app):
     def worker(once, poll_interval):
         from worker.tasks import SequentialWorker
 
+        app.logger.info(
+            "Worker command invoked.",
+            extra={"event": "worker_command_started", "once": once, "poll_interval": poll_interval},
+        )
         submission_worker = SequentialWorker(app=app, poll_interval=poll_interval)
         if once:
             result = submission_worker.run_once()

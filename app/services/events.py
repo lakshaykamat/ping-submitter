@@ -58,11 +58,12 @@ def log_to_terminal(log_entry):
     level = getattr(logging, log_entry["level"].upper(), logging.INFO)
     current_app.logger.log(
         level,
-        "%s job=%s attempt=%s site=%s url=%s %s",
-        log_entry["event_type"],
-        log_entry["job_id"],
-        log_entry["attempt_id"],
-        log_entry["site_id"],
-        log_entry["submitted_url"],
         log_entry["message"],
+        extra={
+            "event": log_entry["event_type"],
+            "job_id": log_entry["job_id"],
+            "attempt_id": log_entry["attempt_id"],
+            "site_id": log_entry["site_id"],
+            "submitted_url": log_entry["submitted_url"],
+        },
     )

@@ -1,7 +1,11 @@
 import argparse
+import logging
 
 from app import create_app
 from worker.tasks import SequentialWorker
+
+
+logger = logging.getLogger(__name__)
 
 
 def main():
@@ -13,8 +17,20 @@ def main():
     app = create_app()
     with app.app_context():
         worker = SequentialWorker(app=app, poll_interval=args.poll_interval)
+        logger.info(
+            "Worker process started.",
+            extra={"event": "worker_process_started", "once": args.once, "poll_interval": args.poll_interval},
+        )
         if args.once:
-            worker.run_once()
+            result = worker.run_once()
+            logger.info(
+                "Worker one-shot finished.",
+                extra={
+                    "event": "worker_once_finished",
+                    "job_id": result["id"] if result else None,
+                    "status": result["status"] if result else "idle",
+                },
+            )
         else:
             worker.run_forever()
 
