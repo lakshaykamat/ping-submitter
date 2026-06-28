@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 
+from app.utils.database_urls import resolve_db_url
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -8,7 +10,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 class Config:
     LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev")
-    DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{BASE_DIR / 'app.db'}")
+    DATABASE_URL = resolve_db_url(os.environ.get("DATABASE_URL", f"sqlite:///{BASE_DIR / 'app.db'}"), BASE_DIR)
     REPORT_DIR = os.environ.get("REPORT_DIR", str(BASE_DIR / "reports"))
     ARTIFACT_DIR = os.environ.get("ARTIFACT_DIR", str(BASE_DIR / "reports" / "artifacts"))
     BROWSER_PROFILE_DIR = os.environ.get("BROWSER_PROFILE_DIR", str(BASE_DIR / "browser_profiles"))
