@@ -33,10 +33,16 @@ def _run_submission_job(job_id, runner=None):
 
 class SequentialWorker:
     def __init__(self, app=None, runner=None, poll_interval=5.0, sleep=time.sleep):
+        from worker.execution import AutomationRunner
+
         self.app = app
-        self.runner = runner
         self.poll_interval = poll_interval
         self.sleep = sleep
+        if runner is None:
+            self.runner = AutomationRunner()
+            self.runner.initialize()
+        else:
+            self.runner = runner
 
     def run_once(self):
         job = next_runnable_job()

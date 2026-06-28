@@ -26,6 +26,7 @@ class AutomationRunner:
         self.agentic_runner = agentic_runner
         self.sleep = sleep or time.sleep
         self.settings = settings
+        self._cached_runner = None
 
     def run_job(self, job_id):
         session = get_session()
@@ -55,6 +56,7 @@ class AutomationRunner:
         )
         site_config["runner_mode"] = "skyvern"
         site_config["captcha_policy"] = attempt.captcha_policy
+        site_config["submission_email"] = current_app.config.get("SUBMISSION_EMAIL", "")
 
         try:
             self.run_skyvern_attempt(job, attempt, site_config)
@@ -93,7 +95,7 @@ class AutomationRunner:
 
         profile = get_or_create_browser_profile(site_config)
         site_memory = approved_site_memory(attempt.site_id)
-        runner = self.agentic_runner or self.create_runner()
+        runner = self.agentic_runner or self._get_runner()
         result = runner.submit_url(
             site_config,
             attempt.submitted_url,
@@ -109,11 +111,22 @@ class AutomationRunner:
         )
         self.apply_agent_result(job, attempt, result)
 
-    def create_runner(self):
-        return SkyvernRunner(
-            sleep=self.sleep,
-            settings=self.settings or SkyvernSettings.from_mapping(current_app.config),
+    def initialize(self):
+        runner = self._get_runner()
+        current_app.logger.info("Initializing Skyvern agent.", extra={"event": "skyvern_agent_init"})
+        runner.initialize()
+        current_app.logger.info(
+            "Skyvern agent ready.",
+            extra={"event": "skyvern_agent_ready", "agent_id": runner._agent_id},
         )
+
+    def _get_runner(self):
+        if self._cached_runner is None:
+            self._cached_runner = SkyvernRunner(
+                sleep=self.sleep,
+                settings=self.settings or SkyvernSettings.from_mapping(current_app.config),
+            )
+        return self._cached_runner
 
     def wait_before_attempt(self, job, attempt, site_config):
         delay_seconds = pre_attempt_delay_seconds(site_config)
