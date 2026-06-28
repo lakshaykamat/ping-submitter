@@ -80,9 +80,24 @@ AGENTIC_MIN_ACTION_DELAY_SECONDS=0.6
 AGENTIC_MAX_ACTION_DELAY_SECONDS=2.0
 AGENTIC_PRE_ATTEMPT_DELAY_SECONDS=1.0
 AGENTIC_MAX_STEPS=80
+CAPTCHA_POLICY_DEFAULT=solve
+OHMYCAPTCHA_BASE_URL=http://127.0.0.1:8000
+OHMYCAPTCHA_CLIENT_KEY=
+OHMYCAPTCHA_REQUEST_TIMEOUT_SECONDS=30
+OHMYCAPTCHA_POLL_INTERVAL_SECONDS=2
+OHMYCAPTCHA_MAX_WAIT_SECONDS=120
 ```
 
-Individual entries in `config/sites.yaml` may set `browser_profile_enabled: true` to reuse an approved profile and `pre_attempt_delay_seconds` to wait longer before opening that service.
+CAPTCHA solving is enabled by default through `CAPTCHA_POLICY_DEFAULT=solve`.
+When a supported reCAPTCHA, hCaptcha, or Cloudflare Turnstile widget appears,
+the browser session creates an OhMyCaptcha task and injects the returned token
+before the agent continues the visible submission flow. Individual entries in
+`config/sites.yaml` may set `captcha_policy: none` to opt out,
+`browser_profile_enabled: true` to reuse an approved profile, and
+`pre_attempt_delay_seconds` to wait longer before opening that service. Hard
+anti-abuse checkpoints such as access denied, rate limits, and Cloudflare
+challenge pages are reported as `restricted_checkpoint` with evidence instead
+of being bypassed.
 
 ## Cleanup
 

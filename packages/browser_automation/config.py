@@ -1,10 +1,11 @@
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
 from packages.captcha_solver import OhMyCaptchaSettings
 
 
-DEFAULT_VIEWPORT = {"width": 1365, "height": 768}
+DEFAULT_VIEWPORT = {"width": 1920, "height": 1080}
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -23,6 +24,8 @@ DEFAULT_BROWSER_ARGS = [
     "--disable-dev-shm-usage",
     "--no-first-run",
     "--no-default-browser-check",
+    "--start-fullscreen",
+    "--start-maximized",
 ]
 SESSION_TIMEOUT_SECONDS = 14400
 
@@ -84,3 +87,28 @@ class BrowserAgentSettings:
             poll_interval_seconds=self.ohmycaptcha_poll_interval_seconds,
             max_wait_seconds=self.ohmycaptcha_max_wait_seconds,
         )
+
+
+@lru_cache(maxsize=1)
+def detected_screen_size():
+    root = None
+    try:
+        import tkinter
+
+        root = tkinter.Tk()
+        root.withdraw()
+        width = int(root.winfo_screenwidth())
+        height = int(root.winfo_screenheight())
+    except Exception:
+        return dict(DEFAULT_VIEWPORT)
+    finally:
+        if root is not None:
+            root.destroy()
+
+    if width <= 0 or height <= 0:
+        return dict(DEFAULT_VIEWPORT)
+    return {"width": width, "height": height}
+
+
+def browser_args(browser_size):
+    return [*DEFAULT_BROWSER_ARGS, f"--window-size={browser_size['width']},{browser_size['height']}"]

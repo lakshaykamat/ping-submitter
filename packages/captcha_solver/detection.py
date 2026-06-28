@@ -4,6 +4,8 @@ CAPTCHA_SELECTORS = (
     'iframe[src*="hcaptcha"]',
     ".h-captcha",
     'iframe[src*="challenges.cloudflare.com"]',
+    ".cf-turnstile",
+    'script[src*="challenges.cloudflare.com/turnstile"]',
     '[id*="captcha" i]',
     '[class*="captcha" i]',
     '[name*="captcha" i]',

@@ -81,6 +81,15 @@ class CaptchaMetadata:
 
 
 @dataclass(frozen=True)
+class BrowserUseCaptchaWaitResult:
+    waited: bool
+    vendor: str
+    url: str
+    duration_ms: int
+    result: str
+
+
+@dataclass(frozen=True)
 class CaptchaSolveResult:
     task_id: str
     status: str

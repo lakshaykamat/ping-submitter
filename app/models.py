@@ -47,7 +47,7 @@ def sync_sqlite_columns(engine):
         "started_at": "DATETIME",
         "finished_at": "DATETIME",
         "runner_mode": "VARCHAR(40) NOT NULL DEFAULT 'agentic'",
-        "captcha_policy": "VARCHAR(40) NOT NULL DEFAULT 'none'",
+        "captcha_policy": "VARCHAR(40) NOT NULL DEFAULT 'solve'",
     }
     with engine.begin() as connection:
         for column_name, column_type in columns_to_add.items():
@@ -110,7 +110,7 @@ class SubmissionAttempt(Base):
     submitted_url = Column(Text, nullable=False)
     status = Column(String(40), nullable=False, default="queued")
     runner_mode = Column(String(40), nullable=False, default="agentic")
-    captcha_policy = Column(String(40), nullable=False, default="none")
+    captcha_policy = Column(String(40), nullable=False, default="solve")
     attempt_number = Column(Integer, nullable=False, default=1)
     failure_reason = Column(Text, nullable=True)
     retry_count = Column(Integer, nullable=False, default=0)

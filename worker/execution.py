@@ -56,7 +56,10 @@ class AutomationRunner:
     def run_attempt(self, job, attempt):
         site_config = self.site_config(attempt.site_id)
         attempt.runner_mode = "agentic"
-        attempt.captcha_policy = site_config.get("captcha_policy", attempt.captcha_policy or "none")
+        attempt.captcha_policy = site_config.get(
+            "captcha_policy",
+            attempt.captcha_policy or current_app.config["CAPTCHA_POLICY_DEFAULT"],
+        )
         site_config["runner_mode"] = "agentic"
         site_config["captcha_policy"] = attempt.captcha_policy
 

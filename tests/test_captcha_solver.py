@@ -77,6 +77,12 @@ def test_detect_captcha_includes_adapter_selectors():
     assert detect_captcha(page, adapter=adapter) == "#custom-captcha"
 
 
+def test_detect_captcha_includes_turnstile_widget_selector():
+    page = FakePage({".cf-turnstile": 1})
+
+    assert detect_captcha(page) == ".cf-turnstile"
+
+
 def test_fill_captcha_answer_uses_first_answer_selector():
     selector = 'input[name*="captcha" i]'
     page = FakePage({selector: 1})
@@ -124,6 +130,25 @@ def test_detect_captcha_metadata_builds_turnstile_task_from_iframe_url():
     assert metadata.kind == TURNSTILE
     assert metadata.task.type == TURNSTILE_TASK
     assert metadata.task.website_key == "turnstile-key"
+
+
+def test_detect_captcha_metadata_builds_turnstile_task_from_widget_site_key():
+    page = FakePage(
+        {
+            ".cf-turnstile": 1,
+            ".cf-turnstile[data-sitekey]": 1,
+        },
+        {
+            ".cf-turnstile[data-sitekey]": {"data-sitekey": "turnstile-widget-key"},
+        },
+    )
+
+    metadata = detect_captcha_metadata(page)
+
+    assert metadata.kind == TURNSTILE
+    assert metadata.selector == ".cf-turnstile"
+    assert metadata.task.type == TURNSTILE_TASK
+    assert metadata.task.website_key == "turnstile-widget-key"
 
 
 def test_solve_detected_captcha_uses_detected_task():
@@ -175,6 +200,37 @@ def test_browser_use_captcha_solver_detects_solves_and_injects_token():
     assert page.injected_tokens == {
         "g-recaptcha-response": "solution-token",
     }
+
+
+def test_browser_use_captcha_solver_handles_turnstile_script_key_and_callback():
+    script_selector = 'script[src*="challenges.cloudflare.com/turnstile"]'
+    page = FakeBrowserUsePage(
+        {
+            script_selector: {
+                "src": "https://challenges.cloudflare.com/turnstile/v0/api.js?render=turnstile-script-key"
+            },
+            ".cf-turnstile[data-callback]": {"data-callback": "onTurnstileSolved"},
+        }
+    )
+    client = FakeCaptchaClient()
+
+    result = asyncio.run(solve_browser_use_captcha(page, client=client))
+
+    assert result.waited is True
+    assert result.result == "success"
+    assert result.vendor == TURNSTILE
+    assert client.tasks == [
+        CaptchaTask(
+            type=TURNSTILE_TASK,
+            website_url="https://example.com/form",
+            website_key="turnstile-script-key",
+        )
+    ]
+    assert page.injected_tokens == {
+        "cf-turnstile-response": "solution-token",
+        "turnstile-response": "solution-token",
+    }
+    assert page.callback_invocations == ["solution-token"]
 
 
 def test_browser_use_captcha_solver_returns_timeout_result_when_solver_times_out():
@@ -316,6 +372,7 @@ class FakeBrowserUsePage:
         self.elements = elements
         self.url = url
         self.injected_tokens = {}
+        self.callback_invocations = []
 
     async def get_url(self):
         return self.url
@@ -334,5 +391,13 @@ class FakeBrowserUsePage:
             for field_name in field_names:
                 self.injected_tokens[field_name] = token
             return str(len(field_names))
+
+        if "data-callback" in page_function:
+            token = args[0]
+            selector = ".cf-turnstile[data-callback]"
+            if selector in self.elements:
+                self.callback_invocations.append(token)
+                return "1"
+            return "0"
 
         raise AssertionError(f"Unexpected script: {page_function}")

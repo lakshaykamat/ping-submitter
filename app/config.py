@@ -13,7 +13,7 @@ class Config:
     ARTIFACT_DIR = os.environ.get("ARTIFACT_DIR", str(BASE_DIR / "reports" / "artifacts"))
     BROWSER_PROFILE_DIR = os.environ.get("BROWSER_PROFILE_DIR", str(BASE_DIR / "browser_profiles"))
     SITES_CONFIG_PATH = os.environ.get("SITES_CONFIG_PATH", str(BASE_DIR / "config" / "sites.yaml"))
-    CAPTCHA_POLICY_DEFAULT = os.environ.get("CAPTCHA_POLICY_DEFAULT", "none")
+    CAPTCHA_POLICY_DEFAULT = os.environ.get("CAPTCHA_POLICY_DEFAULT", "solve")
     CAPTCHA_WAIT_SECONDS = int(os.environ.get("CAPTCHA_WAIT_SECONDS", "120"))
     OHMYCAPTCHA_BASE_URL = os.environ.get("OHMYCAPTCHA_BASE_URL", "http://127.0.0.1:8000")
     OHMYCAPTCHA_CLIENT_KEY = os.environ.get("OHMYCAPTCHA_CLIENT_KEY", os.environ.get("CLIENT_KEY", ""))

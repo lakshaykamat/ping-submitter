@@ -1,6 +1,6 @@
 import asyncio
+import logging
 import time
-from dataclasses import dataclass
 
 from packages.captcha_solver.client import OhMyCaptchaClient
 from packages.captcha_solver.errors import CaptchaSolverError, CaptchaSolverTimeoutError
@@ -14,10 +14,12 @@ from packages.captcha_solver.types import (
     RECAPTCHA_V2,
     TASK_TYPE_BY_CAPTCHA_KIND,
     TURNSTILE,
+    BrowserUseCaptchaWaitResult,
     CaptchaMetadata,
     CaptchaTask,
 )
 
+logger = logging.getLogger(__name__)
 
 CAPTCHA_SELECTORS_BY_KIND = {
     RECAPTCHA_V2: (
@@ -31,6 +33,7 @@ CAPTCHA_SELECTORS_BY_KIND = {
     TURNSTILE: (
         'iframe[src*="challenges.cloudflare.com"]',
         ".cf-turnstile",
+        'script[src*="challenges.cloudflare.com/turnstile"]',
     ),
 }
 
@@ -41,15 +44,6 @@ RESPONSE_FIELDS_BY_KIND = {
 }
 
 
-@dataclass(frozen=True)
-class BrowserUseCaptchaWaitResult:
-    waited: bool
-    vendor: str
-    url: str
-    duration_ms: int
-    result: str
-
-
 async def solve_browser_use_captcha(page, client=None):
     metadata = await detect_browser_use_captcha_metadata(page)
     if metadata is None:
@@ -57,14 +51,19 @@ async def solve_browser_use_captcha(page, client=None):
 
     started_at = time.monotonic()
     solver_client = client or OhMyCaptchaClient()
+    logger.info("Detected %s CAPTCHA on %s.", metadata.kind, metadata.task.website_url)
     try:
         solve_result = await asyncio.to_thread(solver_client.solve_task, metadata.task)
     except CaptchaSolverTimeoutError:
+        logger.warning("CAPTCHA solver timed out for %s.", metadata.task.website_url)
         return captcha_wait_result(metadata, started_at, "timeout")
-    except CaptchaSolverError:
+    except CaptchaSolverError as error:
+        logger.warning("CAPTCHA solver failed for %s: %s", metadata.task.website_url, error)
         return captcha_wait_result(metadata, started_at, "failed")
 
     injected_count = await inject_solution_token(page, metadata.kind, solve_result.token)
+    if metadata.kind == TURNSTILE:
+        injected_count += await notify_turnstile_callback(page, solve_result.token)
     duration_ms = int((time.monotonic() - started_at) * 1000)
 
     if solve_result.solved and injected_count > 0:
@@ -72,6 +71,12 @@ async def solve_browser_use_captcha(page, client=None):
     else:
         result = "failed"
 
+    logger.info(
+        "CAPTCHA solver result for %s: %s with %s updated fields.",
+        metadata.task.website_url,
+        result,
+        injected_count,
+    )
     return BrowserUseCaptchaWaitResult(
         waited=True,
         vendor=metadata.kind,
@@ -191,6 +196,29 @@ async def inject_solution_token(page, kind, token):
             return String(updatedCount);
         }""",
         list(field_names),
+        token,
+    )
+    return int(count or "0")
+
+
+async def notify_turnstile_callback(page, token):
+    if not token:
+        return 0
+
+    count = await page.evaluate(
+        """(tokenValue) => {
+            let calledCount = 0;
+            const widgets = document.querySelectorAll('.cf-turnstile[data-callback]');
+            for (const widget of widgets) {
+                const callbackName = widget.getAttribute('data-callback');
+                const callback = callbackName && window[callbackName];
+                if (typeof callback === 'function') {
+                    callback(tokenValue);
+                    calledCount += 1;
+                }
+            }
+            return String(calledCount);
+        }""",
         token,
     )
     return int(count or "0")

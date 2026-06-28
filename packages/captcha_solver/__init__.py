@@ -1,5 +1,4 @@
 from packages.captcha_solver.browser_use import (
-    BrowserUseCaptchaWaitResult,
     detect_browser_use_captcha_metadata,
     inject_solution_token,
     solve_browser_use_captcha,
@@ -21,6 +20,7 @@ from packages.captcha_solver.errors import (
 from packages.captcha_solver.metadata import detect_captcha_metadata
 from packages.captcha_solver.solver import CaptchaSolver, solve_detected_captcha
 from packages.captcha_solver.types import (
+    BrowserUseCaptchaWaitResult,
     HCAPTCHA,
     HCAPTCHA_TASK,
     RECAPTCHA_V2,

@@ -169,19 +169,25 @@ Key settings include:
 - Stable viewport, request headers, user agent, navigation timeout, and action timeout settings.
 - Persisted browser profiles by default, unless a site disables profile reuse.
 - Agent instructions for consent, login, CAPTCHA, rate-limit, and restricted-checkpoint outcomes.
+- Runtime restricted-checkpoint detection for hard access blocks that should be reported instead of retried.
 - Clear reporting when a target service blocks, rejects, or cannot complete an attempt.
 
-These measures are applied for reliability, observability, and respectful low-volume operation. The system does not rotate identities to avoid limits or perform high-volume submissions. Sites can opt in to CAPTCHA solving through a local OhMyCaptcha service.
+These measures are applied for reliability, observability, and respectful low-volume operation. The system does not rotate identities to avoid limits or perform high-volume submissions. CAPTCHA solving is enabled by default through a local OhMyCaptcha service, and sites can opt out with `captcha_policy: none`.
 
 ## Checkpoints
 
 CAPTCHA solving is policy-controlled:
 
-- Sites with `captcha_policy: solve` use the configured OhMyCaptcha-compatible service.
+- Sites default to `captcha_policy: solve` and use the configured OhMyCaptcha-compatible service.
+- Sites with `captcha_policy: none` skip automatic solver use.
 - The default local service URL is `http://127.0.0.1:8000` through `OHMYCAPTCHA_BASE_URL`.
 - `OHMYCAPTCHA_CLIENT_KEY` is read from `.env` when the solver service requires a client key.
+- Supported CAPTCHA widgets are submitted to OhMyCaptcha as reCAPTCHA v2, hCaptcha, or Cloudflare Turnstile tasks.
+- Solver tokens are injected into the browser page so the agent can continue the visible submission flow.
 - If solving fails or the CAPTCHA remains unresolved, the attempt is marked failed with evidence.
 - There is no human CAPTCHA checkpoint in the agent flow.
+
+Hard anti-abuse checkpoints are separate from CAPTCHA solving. Access denied pages, rate-limit pages, and Cloudflare challenge pages without a supported widget are reported as `restricted_checkpoint` with evidence. The system does not bypass those checkpoints.
 
 Sensitive or unsupported actions are not handed to a human checkpoint. Payment, signup, account changes, deletion, subscription, email/OTP verification, and uncertain irreversible actions cause the agent to skip or fail the attempt with evidence.
 
@@ -192,7 +198,7 @@ Each finished run writes screenshots where available and JSON/Markdown reports u
 ## Boundaries
 
 - No high-volume automation.
-- CAPTCHA solving is available only through the configured local OhMyCaptcha-compatible service and only for sites that opt in with `captcha_policy: solve`.
+- CAPTCHA solving is available only through the configured local OhMyCaptcha-compatible service and can be disabled per site with `captcha_policy: none`.
 - No email or OTP automation.
 - Uses realistic browser defaults, persisted profiles, request headers, stealth initialization, pacing, and optional OhMyCaptcha solving to reduce avoidable browser friction, but does not automate email/OTP or perform high-volume submissions.
 - No unrestricted browsing.

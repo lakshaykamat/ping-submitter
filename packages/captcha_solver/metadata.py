@@ -26,6 +26,7 @@ SITE_KEY_SELECTORS_BY_KIND = {
         ".cf-turnstile[data-sitekey]",
         '[data-sitekey][class*="cf-turnstile" i]',
         'iframe[src*="challenges.cloudflare.com"]',
+        'script[src*="challenges.cloudflare.com/turnstile"]',
     ),
 }
 

@@ -1,7 +1,11 @@
 from dataclasses import dataclass, field
 
 
-CAPTCHA_FAILURE_REASON = "CAPTCHA encountered; CAPTCHA solving is not implemented and is reserved for future work."
+DEFAULT_CAPTCHA_POLICY = "solve"
+CAPTCHA_FAILURE_REASON = (
+    "CAPTCHA encountered; solving is disabled or unavailable for this site. "
+    "Enable captcha_policy: solve with the configured local solver, or submit manually."
+)
 CAPTCHA_AGENT_STATUSES = {
     "captcha_required",
     "captcha_failed",
@@ -36,10 +40,10 @@ AGENT_BROWSER_TOOLS = (
     "close overlays",
 )
 AGENT_LOOP_STEPS = (
-    "observe the current browser state",
+    "observe the current browser state and review the previous action outcome",
     "decide the next safe action",
     "use one browser tool",
-    "check whether the submission is complete",
+    "verify required fields before submit and check whether the submission is complete",
 )
 SENSITIVE_ACTION_PATTERNS = {
     "payment": ("payment", "credit card", "card number", "billing"),
@@ -56,3 +60,9 @@ class AgentResult:
     confidence: float | None = None
     evidence: dict = field(default_factory=dict)
     screenshot_path: str | None = None
+
+
+@dataclass(frozen=True)
+class RestrictedCheckpoint:
+    reason: str
+    url: str = ""
