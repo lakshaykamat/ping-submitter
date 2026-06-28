@@ -3,59 +3,43 @@ sites:
     name: Ping-O-Matic
     url: https://pingomatic.com/
     enabled: true
-    captcha_policy: solve
   - id: sitesondisplay
     name: Sites On Display
     url: https://www.sitesondisplay.com/add.html
     enabled: true
-    captcha_policy: solve
   - id: indexkings
     name: Index Kings
     url: http://www.indexkings.com/index.php
     enabled: true
-    captcha_policy: solve
   - id: pingmyurls
     name: Ping My URLs
     url: https://www.pingmyurls.com/
     enabled: true
-    captcha_policy: solve
   - id: bulklink
     name: BulkLink
     url: http://bulklink.org/
     enabled: true
-    captcha_policy: solve
   - id: wmtools_mass_ping
     name: WMTools Mass Ping
     url: https://wmtools.me/mass-ping
     enabled: false
-    captcha_policy: solve
   - id: smallseotools_ping
     name: Small SEO Tools Online Ping
     url: https://smallseotools.com/online-ping-website-tool/
     enabled: false
-    captcha_policy: solve
   - id: pingler
     name: Pingler
     url: https://pingler.com/
     enabled: false
-    captcha_policy: solve
   - id: duplichecker_ping
     name: DupliChecker Search Engine Pinging
     url: https://www.duplichecker.com/search-engine-pinging-website-tool.php
     enabled: false
-    captcha_policy: solve
   - id: prepostseo_ping
     name: PrePostSEO Ping Multiple URLs
     url: https://www.prepostseo.com/ping-multiple-urls-online
     enabled: false
-    captcha_policy: solve
-  - id: wdso_guestbook
-    name: WDSO Guestbook
-    url: https://wdso.at/home/downloads/index.php?page=UserGuestbook&userID=208&entryID=574959&s=28690691ff0628b561471ab1c97d0fa99c828669#entry574959
-    enabled: false
-    captcha_policy: solve
   - id: zip_guestbook
     name: Zip Guestbook
     url: https://zip.dk/gaeste/bog.php3/4653/
     enabled: false
-    captcha_policy: solve

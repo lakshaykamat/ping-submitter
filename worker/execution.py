@@ -113,11 +113,11 @@ class AutomationRunner:
 
     def initialize(self):
         runner = self._get_runner()
-        current_app.logger.info("Initializing Skyvern agent.", extra={"event": "skyvern_agent_init"})
-        runner.initialize()
+        current_app.logger.info("Pinging Skyvern.", extra={"event": "skyvern_ping"})
+        info = runner.ping()
         current_app.logger.info(
-            "Skyvern agent ready.",
-            extra={"event": "skyvern_agent_ready", "agent_id": runner._agent_id},
+            "Skyvern ready.",
+            extra={"event": "skyvern_ready", "version": info.get("version")},
         )
 
     def _get_runner(self):

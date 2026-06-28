@@ -38,11 +38,7 @@ class SequentialWorker:
         self.app = app
         self.poll_interval = poll_interval
         self.sleep = sleep
-        if runner is None:
-            self.runner = AutomationRunner()
-            self.runner.initialize()
-        else:
-            self.runner = runner
+        self.runner = runner if runner is not None else AutomationRunner()
 
     def run_once(self):
         job = next_runnable_job()

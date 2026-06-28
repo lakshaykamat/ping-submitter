@@ -27,6 +27,7 @@ def create_app(test_config=None):
     init_database(app)
     register_routes(app)
     register_cli(app)
+    _init_skyvern(app)
     app.logger.info(
         "Application configured.",
         extra={
@@ -38,6 +39,20 @@ def create_app(test_config=None):
         },
     )
     return app
+
+
+def _init_skyvern(app):
+    if app.config.get("TESTING"):
+        return
+    from worker.execution import AutomationRunner
+    with app.app_context():
+        try:
+            AutomationRunner().initialize()
+        except Exception as exc:
+            app.logger.warning(
+                "Skyvern unreachable at startup.",
+                extra={"event": "skyvern_init_failed", "error": str(exc)},
+            )
 
 
 def register_cli(app):

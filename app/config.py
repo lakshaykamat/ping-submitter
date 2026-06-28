@@ -24,4 +24,8 @@ class Config:
     SKYVERN_POLL_INTERVAL_SECONDS = float(os.environ.get("SKYVERN_POLL_INTERVAL_SECONDS", "5.0"))
     SKYVERN_TASK_TIMEOUT_SECONDS = float(os.environ.get("SKYVERN_TASK_TIMEOUT_SECONDS", "3600.0"))
     SKYVERN_RECORD_SESSION = os.environ.get("SKYVERN_RECORD_SESSION", "false")
+    # OhMyCaptcha is consumed by Skyvern directly (via env vars in its process).
+    # These are listed here so a single .env file can configure both services.
+    OHMYCAPTCHA_BASE_URL = os.environ.get("OHMYCAPTCHA_BASE_URL", "http://127.0.0.1:8000")
+    OHMYCAPTCHA_CLIENT_KEY = os.environ.get("OHMYCAPTCHA_CLIENT_KEY", "")
     TESTING = False

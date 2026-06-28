@@ -10,7 +10,7 @@ def build_agent_goal():
     ])
 
 
-def build_run_goal(site, submitted_url):
+def build_run_goal(site, submitted_url, captcha_policy="solve"):
     target = _parse_url(submitted_url)
     email = site.get("submission_email") or ""
     email_instruction = (
@@ -25,22 +25,25 @@ def build_run_goal(site, submitted_url):
         "",
         "URL field rules:",
         f"- If the field already contains exactly {submitted_url}, leave it untouched.",
-        f"- If the field shows http:// or https:// as a fixed prefix, type only: {target['without_scheme']}",
-        f"- Otherwise clear the field and type: {submitted_url}",
+        f"- If the URL field has a non-editable prefix element (a read-only label or span outside the input) showing http:// or https://, type only: {target['without_scheme']}",
+        f"- Otherwise clear the field completely and type the full URL: {submitted_url}",
         "- Never produce a doubled scheme such as http://http://example.com.",
+        "- If the field contains only a placeholder like 'https://' or 'http://' that is part of the editable input, clear it and type the full URL.",
         "",
         "Other fields:",
         f'- Name / title / blog name fields: use "{target["default_title"]}"',
         email_instruction,
         "- Any other optional fields: leave empty.",
         "",
-        "CAPTCHA handling:",
-        '- If a checkbox labelled "Verify I\'m human", "I\'m not a robot", or similar appears, click it before submitting.',
-        "- If a reCAPTCHA or hCAPTCHA widget is present, attempt to solve or tick it before submitting.",
-        "- Do not proceed to submit until any CAPTCHA on the page has been completed.",
+        *_captcha_instructions(captcha_policy),
         "",
-        "After submitting, wait for the page to show a success message or confirmation.",
-        "Return success only when the page visibly confirms the submission was accepted.",
+        "After submitting, wait for the page to show confirmation that the submission was accepted.",
+        "Success indicators vary by service — any of the following count as success:",
+        "- A visible success or thank-you message.",
+        "- A progress screen saying the submission is being processed (e.g. 'Submitting Your Website...').",
+        "- A list or table of URLs/directories being pinged or indexed on your behalf.",
+        "- Redirection to a results or status page showing your URL being processed.",
+        "Do not require an explicit 'success' text — if the page clearly moved past the form and is processing the submission, that is success.",
     ])
 
 
@@ -62,6 +65,22 @@ def _parse_url(url):
         "hostname": hostname,
         "default_title": _default_title(hostname),
     }
+
+
+def _captcha_instructions(captcha_policy):
+    if captcha_policy == "solve":
+        return [
+            "CAPTCHA handling:",
+            "- If any CAPTCHA appears (Cloudflare Turnstile, reCAPTCHA, hCAPTCHA, or similar), use the solve_captcha action — do NOT click or interact with the widget manually.",
+            "- The solve_captcha action automatically obtains and injects a valid token; wait for it to confirm success before submitting.",
+            "- Do not proceed to submit until any CAPTCHA on the page has been resolved.",
+        ]
+    return [
+        "CAPTCHA handling:",
+        '- If a checkbox labelled "Verify you are human", "I\'m not a robot", or similar appears, click it ONCE and then wait.',
+        "- After clicking, wait at least 3-5 seconds for verification to complete — do NOT click again while it is processing.",
+        "- Do not proceed to submit until any CAPTCHA has been completed.",
+    ]
 
 
 def _default_title(hostname):
