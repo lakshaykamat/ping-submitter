@@ -4,6 +4,7 @@ from packages.captcha_solver.detection import detect_captcha, selector_exists
 from packages.captcha_solver.types import (
     HCAPTCHA,
     RECAPTCHA_V2,
+    RECAPTCHA_V3,
     TASK_TYPE_BY_CAPTCHA_KIND,
     TURNSTILE,
     CaptchaMetadata,
@@ -12,6 +13,9 @@ from packages.captcha_solver.types import (
 
 
 SITE_KEY_SELECTORS_BY_KIND = {
+    RECAPTCHA_V3: (
+        'script[src*="recaptcha/api.js?render"]',
+    ),
     RECAPTCHA_V2: (
         ".g-recaptcha[data-sitekey]",
         '[data-sitekey][class*="g-recaptcha" i]',
@@ -56,6 +60,8 @@ def detect_captcha_metadata(page, adapter=None):
 
 def captcha_kind_for_selector(selector):
     normalized_selector = selector.lower()
+    if "recaptcha/api.js?render" in normalized_selector:
+        return RECAPTCHA_V3
     if "hcaptcha" in normalized_selector or "h-captcha" in normalized_selector:
         return HCAPTCHA
     if "turnstile" in normalized_selector or "challenges.cloudflare.com" in normalized_selector:

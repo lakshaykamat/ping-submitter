@@ -1,4 +1,5 @@
 CAPTCHA_SELECTORS = (
+    'script[src*="recaptcha/api.js?render"]',
     'iframe[src*="recaptcha"]',
     ".g-recaptcha",
     'iframe[src*="hcaptcha"]',

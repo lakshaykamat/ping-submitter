@@ -182,7 +182,9 @@ CAPTCHA solving is policy-controlled:
 - Sites with `captcha_policy: none` skip automatic solver use.
 - The default local service URL is `http://127.0.0.1:8000` through `OHMYCAPTCHA_BASE_URL`.
 - `OHMYCAPTCHA_CLIENT_KEY` is read from `.env` when the solver service requires a client key.
-- Supported CAPTCHA widgets are submitted to OhMyCaptcha as reCAPTCHA v2, hCaptcha, or Cloudflare Turnstile tasks.
+- Supported CAPTCHA widgets are submitted to OhMyCaptcha as reCAPTCHA v2, reCAPTCHA v3, hCaptcha, or Cloudflare Turnstile tasks.
+- Image CAPTCHA and classification task payloads are available through the shared OhMyCaptcha client for callers that already have the image data.
+- OhMyCaptcha task names are package constants in `packages.captcha_solver.types`.
 - Solver tokens are injected into the browser page so the agent can continue the visible submission flow.
 - If solving fails or the CAPTCHA remains unresolved, the attempt is marked failed with evidence.
 - There is no human CAPTCHA checkpoint in the agent flow.

@@ -12,6 +12,7 @@ from packages.captcha_solver.metadata import (
 from packages.captcha_solver.types import (
     HCAPTCHA,
     RECAPTCHA_V2,
+    RECAPTCHA_V3,
     TASK_TYPE_BY_CAPTCHA_KIND,
     TURNSTILE,
     BrowserUseCaptchaWaitResult,
@@ -22,6 +23,9 @@ from packages.captcha_solver.types import (
 logger = logging.getLogger(__name__)
 
 CAPTCHA_SELECTORS_BY_KIND = {
+    RECAPTCHA_V3: (
+        'script[src*="recaptcha/api.js?render"]',
+    ),
     RECAPTCHA_V2: (
         'iframe[src*="recaptcha"]',
         ".g-recaptcha",
@@ -39,6 +43,7 @@ CAPTCHA_SELECTORS_BY_KIND = {
 
 RESPONSE_FIELDS_BY_KIND = {
     RECAPTCHA_V2: ("g-recaptcha-response",),
+    RECAPTCHA_V3: ("g-recaptcha-response",),
     HCAPTCHA: ("h-captcha-response",),
     TURNSTILE: ("cf-turnstile-response", "turnstile-response"),
 }

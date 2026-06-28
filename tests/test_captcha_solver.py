@@ -5,10 +5,19 @@ from dataclasses import dataclass
 import pytest
 
 from packages.captcha_solver import (
+    AWS_CLASSIFICATION_TASK,
+    FUNCAPTCHA_CLASSIFICATION_TASK,
+    HCAPTCHA_CLASSIFICATION_TASK,
+    IMAGE_TO_TEXT_TASK,
+    NO_CAPTCHA_TASK,
     RECAPTCHA_V2,
+    RECAPTCHA_V2_CLASSIFICATION_TASK,
+    RECAPTCHA_V3,
+    RECAPTCHA_V3_TASK,
     RECAPTCHA_V2_TASK,
     TURNSTILE,
     TURNSTILE_TASK,
+    TURNSTILE_TASK_M1,
     CaptchaSolveResult,
     CaptchaSolverApiError,
     CaptchaSolverTimeoutError,
@@ -111,6 +120,28 @@ def test_detect_captcha_metadata_builds_recaptcha_task_from_site_key():
         type=RECAPTCHA_V2_TASK,
         website_url="https://example.com/form",
         website_key="site-key-123",
+    )
+
+
+def test_detect_captcha_metadata_builds_recaptcha_v3_task_from_render_script():
+    selector = 'script[src*="recaptcha/api.js?render"]'
+    page = FakePage(
+        {selector: 1},
+        {
+            selector: {
+                "src": "https://www.google.com/recaptcha/api.js?render=v3-site-key"
+            },
+        },
+    )
+
+    metadata = detect_captcha_metadata(page)
+
+    assert metadata.kind == RECAPTCHA_V3
+    assert metadata.selector == selector
+    assert metadata.task == CaptchaTask(
+        type=RECAPTCHA_V3_TASK,
+        website_url="https://example.com/form",
+        website_key="v3-site-key",
     )
 
 
@@ -233,6 +264,26 @@ def test_browser_use_captcha_solver_handles_turnstile_script_key_and_callback():
     assert page.callback_invocations == ["solution-token"]
 
 
+def test_browser_use_captcha_metadata_builds_recaptcha_v3_task_from_render_script():
+    selector = 'script[src*="recaptcha/api.js?render"]'
+    page = FakeBrowserUsePage(
+        {
+            selector: {
+                "src": "https://www.google.com/recaptcha/api.js?render=v3-site-key"
+            },
+        }
+    )
+
+    metadata = asyncio.run(detect_browser_use_captcha_metadata(page))
+
+    assert metadata.kind == RECAPTCHA_V3
+    assert metadata.task == CaptchaTask(
+        type=RECAPTCHA_V3_TASK,
+        website_url="https://example.com/form",
+        website_key="v3-site-key",
+    )
+
+
 def test_browser_use_captcha_solver_returns_timeout_result_when_solver_times_out():
     page = FakeBrowserUsePage(
         {
@@ -298,6 +349,251 @@ def test_ohmycaptcha_client_solves_task_by_polling():
     }
     assert calls[1]["url"] == "http://solver.test/getTaskResult"
     assert calls[1]["payload"] == {"clientKey": "client-key", "taskId": "task-1"}
+
+
+def test_ohmycaptcha_client_uses_explicit_recaptcha_v2_task_type_and_invisible_option():
+    calls = []
+    opener = fake_opener(
+        [
+            {"errorId": 0, "taskId": "task-1"},
+            {"status": "ready", "solution": {"gRecaptchaResponse": "solution-token"}},
+        ],
+        calls,
+    )
+    settings = OhMyCaptchaSettings(
+        base_url="http://solver.test",
+        client_key="client-key",
+        poll_interval_seconds=0,
+        max_wait_seconds=10,
+    )
+    client = OhMyCaptchaClient(settings=settings, opener=opener, sleep=lambda seconds: None)
+
+    result = client.solve_task(
+        CaptchaTask(
+            type=NO_CAPTCHA_TASK,
+            website_url="https://example.com/form",
+            website_key="site-key-123",
+            is_invisible=True,
+        )
+    )
+
+    assert result.token == "solution-token"
+    assert calls[0]["payload"]["task"] == {
+        "type": NO_CAPTCHA_TASK,
+        "websiteURL": "https://example.com/form",
+        "websiteKey": "site-key-123",
+        "isInvisible": True,
+    }
+
+
+def test_ohmycaptcha_client_builds_recaptcha_v3_payload():
+    calls = []
+    opener = fake_opener(
+        [
+            {"errorId": 0, "taskId": "task-1"},
+            {"status": "ready", "solution": {"gRecaptchaResponse": "v3-token"}},
+        ],
+        calls,
+    )
+    client = OhMyCaptchaClient(
+        settings=OhMyCaptchaSettings(
+            base_url="http://solver.test",
+            client_key="client-key",
+            poll_interval_seconds=0,
+            max_wait_seconds=10,
+        ),
+        opener=opener,
+        sleep=lambda seconds: None,
+    )
+
+    result = client.solve_task(
+        CaptchaTask(
+            type=RECAPTCHA_V3_TASK,
+            website_url="https://example.com/form",
+            website_key="v3-site-key",
+            page_action="homepage",
+        )
+    )
+
+    assert result.token == "v3-token"
+    assert calls[0]["payload"]["task"] == {
+        "type": RECAPTCHA_V3_TASK,
+        "websiteURL": "https://example.com/form",
+        "websiteKey": "v3-site-key",
+        "pageAction": "homepage",
+    }
+
+
+def test_ohmycaptcha_client_can_use_turnstile_m1_task_type():
+    calls = []
+    opener = fake_opener(
+        [
+            {"errorId": 0, "taskId": "task-1"},
+            {"status": "ready", "solution": {"token": "turnstile-token"}},
+        ],
+        calls,
+    )
+    settings = OhMyCaptchaSettings(
+        base_url="http://solver.test",
+        client_key="client-key",
+        poll_interval_seconds=0,
+        max_wait_seconds=10,
+    )
+    client = OhMyCaptchaClient(
+        settings=settings,
+        opener=opener,
+        sleep=lambda seconds: None,
+    )
+
+    result = client.solve_task(
+        CaptchaTask(
+            type=TURNSTILE_TASK_M1,
+            website_url="https://example.com/form",
+            website_key="turnstile-key",
+        )
+    )
+
+    assert result.solved is True
+    assert result.token == "turnstile-token"
+    assert calls[0]["payload"]["task"] == {
+        "type": TURNSTILE_TASK_M1,
+        "websiteURL": "https://example.com/form",
+        "websiteKey": "turnstile-key",
+    }
+
+
+def test_ohmycaptcha_client_builds_image_captcha_payload():
+    calls = []
+    opener = fake_opener(
+        [
+            {"errorId": 0, "taskId": "task-1"},
+            {"status": "ready", "solution": {"text": "abc123"}},
+        ],
+        calls,
+    )
+    client = OhMyCaptchaClient(
+        settings=OhMyCaptchaSettings(
+            base_url="http://solver.test",
+            client_key="client-key",
+            poll_interval_seconds=0,
+            max_wait_seconds=10,
+        ),
+        opener=opener,
+        sleep=lambda seconds: None,
+    )
+
+    result = client.solve_task(CaptchaTask(type=IMAGE_TO_TEXT_TASK, body="base64-image"))
+
+    assert result.token == "abc123"
+    assert calls[0]["payload"]["task"] == {
+        "type": IMAGE_TO_TEXT_TASK,
+        "body": "base64-image",
+    }
+
+
+def test_captcha_task_builds_classification_payloads():
+    recaptcha_task = CaptchaTask(
+        type=RECAPTCHA_V2_CLASSIFICATION_TASK,
+        image="base64-image",
+        question="Select all images with traffic lights",
+    )
+    hcaptcha_task = CaptchaTask(
+        type=HCAPTCHA_CLASSIFICATION_TASK,
+        queries=("base64-image-1", "base64-image-2"),
+        question="Please click each image containing a bicycle",
+    )
+
+    assert recaptcha_task.to_payload() == {
+        "type": RECAPTCHA_V2_CLASSIFICATION_TASK,
+        "image": "base64-image",
+        "question": "Select all images with traffic lights",
+    }
+    assert hcaptcha_task.to_payload() == {
+        "type": HCAPTCHA_CLASSIFICATION_TASK,
+        "queries": ["base64-image-1", "base64-image-2"],
+        "question": "Please click each image containing a bicycle",
+    }
+
+
+def test_ohmycaptcha_client_builds_all_classification_payloads():
+    calls = []
+    opener = fake_opener(
+        [
+            {"errorId": 0, "taskId": "task-1"},
+            {"status": "ready", "solution": {"objects": [1, 4]}},
+            {"errorId": 0, "taskId": "task-2"},
+            {"status": "ready", "solution": {"objects": [0, 3, 6]}},
+            {"errorId": 0, "taskId": "task-3"},
+            {"status": "ready", "solution": {"objects": [3]}},
+            {"errorId": 0, "taskId": "task-4"},
+            {"status": "ready", "solution": {"objects": [1]}},
+        ],
+        calls,
+    )
+    client = OhMyCaptchaClient(
+        settings=OhMyCaptchaSettings(
+            base_url="http://solver.test",
+            client_key="client-key",
+            poll_interval_seconds=0,
+            max_wait_seconds=10,
+        ),
+        opener=opener,
+        sleep=lambda seconds: None,
+    )
+
+    hcaptcha_result = client.solve_task(
+        CaptchaTask(
+            type=HCAPTCHA_CLASSIFICATION_TASK,
+            queries=("base64-image-1", "base64-image-2"),
+            question="Please click each image containing a bicycle",
+        )
+    )
+    recaptcha_result = client.solve_task(
+        CaptchaTask(
+            type=RECAPTCHA_V2_CLASSIFICATION_TASK,
+            image="base64-grid",
+            question="Select all images with traffic lights",
+        )
+    )
+    funcaptcha_result = client.solve_task(
+        CaptchaTask(
+            type=FUNCAPTCHA_CLASSIFICATION_TASK,
+            image="base64-grid",
+            question="Pick the image that shows a boat facing left",
+        )
+    )
+    aws_result = client.solve_task(
+        CaptchaTask(
+            type=AWS_CLASSIFICATION_TASK,
+            image="base64-image",
+            question="Select the image that matches",
+        )
+    )
+
+    assert hcaptcha_result.objects == [1, 4]
+    assert recaptcha_result.objects == [0, 3, 6]
+    assert funcaptcha_result.objects == [3]
+    assert aws_result.objects == [1]
+    assert calls[0]["payload"]["task"] == {
+        "type": HCAPTCHA_CLASSIFICATION_TASK,
+        "queries": ["base64-image-1", "base64-image-2"],
+        "question": "Please click each image containing a bicycle",
+    }
+    assert calls[2]["payload"]["task"] == {
+        "type": RECAPTCHA_V2_CLASSIFICATION_TASK,
+        "image": "base64-grid",
+        "question": "Select all images with traffic lights",
+    }
+    assert calls[4]["payload"]["task"] == {
+        "type": FUNCAPTCHA_CLASSIFICATION_TASK,
+        "image": "base64-grid",
+        "question": "Pick the image that shows a boat facing left",
+    }
+    assert calls[6]["payload"]["task"] == {
+        "type": AWS_CLASSIFICATION_TASK,
+        "image": "base64-image",
+        "question": "Select the image that matches",
+    }
 
 
 def test_ohmycaptcha_client_raises_api_errors():

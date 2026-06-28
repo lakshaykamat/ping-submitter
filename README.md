@@ -94,7 +94,11 @@ the browser session creates an OhMyCaptcha task and injects the returned token
 before the agent continues the visible submission flow. Individual entries in
 `config/sites.yaml` may set `captcha_policy: none` to opt out,
 `browser_profile_enabled: true` to reuse an approved profile, and
-`pre_attempt_delay_seconds` to wait longer before opening that service. Hard
+`pre_attempt_delay_seconds` to wait longer before opening that service.
+Image CAPTCHA and classification tasks are exposed by the shared
+`packages.captcha_solver` client for callers that already have the image data
+and question prompt. OhMyCaptcha task names are package constants in
+`packages.captcha_solver.types`, not environment settings. Hard
 anti-abuse checkpoints such as access denied, rate limits, and Cloudflare
 challenge pages are reported as `restricted_checkpoint` with evidence instead
 of being bypassed.

@@ -22,7 +22,11 @@ from packages.browser_automation.config import (
     detected_screen_size,
 )
 from packages.browser_automation.prompts import build_agent_task, target_url_context
-from packages.captcha_solver import CaptchaSolveResult, CaptchaTask, RECAPTCHA_V2_TASK
+from packages.captcha_solver import (
+    CaptchaSolveResult,
+    CaptchaTask,
+    RECAPTCHA_V2_TASK,
+)
 
 
 class FakeHistory:
