@@ -2,162 +2,176 @@
 
 ## Summary
 
-Ping Submission Automation is a low-volume automation tool for submitting URLs to external ping submission services. It uses an agentic browser-use runner for every target service.
+Ping Submission Automation is a low-volume Flask application for creating URL submission jobs, running those jobs through a sequential worker, and preserving evidence for each attempt. The web app persists jobs in SQLite; a separate worker process polls runnable jobs and delegates browser automation to reusable packages.
 
 The product is built for visibility. Every attempt should end with clear evidence: success, failure, skipped, or CAPTCHA failure.
 
 ## High-Level Design
 
 ```text
-+------------------+
-| User             |
-| chooses URLs and |
-| target services  |
-+--------+---------+
-         |
-         v
-+------------------+        +----------------------+
-| Web Dashboard    |------->| Job Record           |
-| shows progress,  |        | URLs, services,      |
-| reports, results |        | status, evidence     |
-+--------+---------+        +----------+-----------+
-         |                             |
-         v                             v
-+--------------------------------------------------+
-| Automation Coordinator                           |
-| Starts each browser-use attempt and records      |
-| success, failure, skip, CAPTCHA, and reasons.    |
-+----------------------+---------------------------+
-                       |
-        +--------------+--------------+
-        |                             |
-        v                             v
-+------------------+        +----------------------+
-| Browser Session  |        | Automated Decisions  |
-| opens the target |        | detect CAPTCHA,      |
-| service and      |        | continue, skip, or   |
-| tries to submit  |        | fail safely          |
-+--------+---------+        +----------+-----------+
-         |                             |
-         +--------------+--------------+
-                        |
-                        v
-              +------------------+
-              | External Service |
-              | accepts, rejects,|
-              | blocks, or shows |
-              | CAPTCHA          |
-              +--------+---------+
-                       |
-                       v
-              +------------------+
-              | Evidence Output  |
-              | screenshots and  |
-              | JSON/MD report   |
-              +------------------+
++-------------+       +----------------+
+| Person      |       | Web Screen     |
+| adds URLs   +------>| creates a job  |
++-------------+       +-------+--------+
+                              |
+                              v
+                      +----------------+
+                      | Saved Job List |
+                      | work + history |
+                      +-------+--------+
+                              ^
+                              |
+                      +-------+--------+
+                      | Job Runner     |
+                      | picks one job  |
+                      | at a time      |
+                      +-------+--------+
+                              |
+                              v
+                      +----------------+
+                      | Browser        |
+                      | visits target  |
+                      | websites       |
+                      +-------+--------+
+                              |
+                              v
+                      +----------------+
+                      | Results        |
+                      | status, reason,|
+                      | screenshots,   |
+                      | reports        |
+                      +----------------+
 ```
 
-The user starts from the dashboard, submits one or more URLs, and watches each target service move through a clear state. The browser-use agent takes browser actions, fails when CAPTCHA appears, and records evidence for every outcome.
+The dashboard and JSON API create jobs and expose status, events, and reports. They do not run automation inside web requests. Execution is owned by a plain Python sequential worker that picks the oldest runnable job from SQLite and processes its attempts one at a time.
+
+Application-specific state lives under `app/`: routes, SQLAlchemy models, site loading, profile management, event recording, and report generation. Reusable automation logic lives under `packages/` and intentionally does not import Flask, SQLAlchemy, workers, or app services.
+
+`config/sites.yaml` defines known targets. `app.services.sites.normalize_site_config()` currently normalizes all enabled sites to the agentic runner with `captcha_policy` set to `none`, enables browser profile reuse by default, and allows per-site pre-attempt delays.
 
 The system is intentionally conservative. If the agent reaches a step it should not complete, such as login, payment, account creation, or email verification, it does not ask for a human checkpoint. It skips or fails the attempt with a clear reason.
 
 ## Low-Level Design
 
 ```text
-+---------------------+
-| Job Created         |
-| URLs x services     |
-+----------+----------+
-           |
-           v
-+---------------------+
-| Pick Next Attempt   |
-| queued or retryable |
-+----------+----------+
-           |
-           v
-+---------------------+
-| Load Service Rules  |
-| browser-use target  |
-| and CAPTCHA policy  |
-+----------+----------+
-           |
-           v
-           |
-           v
 +----------------+
-| Agentic Path   |
-| observe page,  |
-| choose action, |
-| use browser,   |
-| repeat until   |
-| done or final  |
+| User enters    |
+| URLs and sites |
 +-------+--------+
         |
         v
-              +------------------+
-              | Check Page State |
-              | success, error,  |
-              | CAPTCHA, blocked,|
-              | unsupported step |
-              +---+----------+---+
-                  |          |
-       +----------+          +-------------+
-       |                                   |
-       v                                   v
-+-------------+                    +----------------+
-| Final Result|                    | CAPTCHA Seen   |
-| success,    |                    | fail attempt   |
-| retry, skip,|                    | with reason    |
-| or failure  |                    |                |
-+------+------+                    +-------+--------+
-       |                                   |
-       +----------------+--------+
-                        |
-                        v
-              +------------------+
-              | Save Evidence   |
-              | status, reason, |
-              | screenshots,    |
-              | report files    |
-              +--------+---------+
-                       |
-                       v
-              +------------------+
-              | More Attempts?  |
-              +---+----------+---+
-                  |          |
-                 yes         no
-                  |          |
-                  v          v
-        +---------+--+   +----------+
-        | Next Attempt|  | Job Done |
-        +-------------+  +----------+
++----------------+
+| System checks  |
+| the request    |
++-------+--------+
+        |
+        v
++----------------+
+| Job is saved   |
+| for later work |
++-------+--------+
+        |
+        v
++----------------+
+| Page shows the |
+| job as queued  |
++-------+--------+
+        |
+        v
++----------------+
+| Runner picks   |
+| the next job   |
++-------+--------+
+        |
+        v
++----------------+
+| Browser opens  |
+| each selected  |
+| website        |
++-------+--------+
+        |
+        v
++----------------+
+| Browser tries  |
+| to submit the  |
+| URL safely     |
++-------+--------+
+        |
+        v
++----------------+
+| Site accepts,  |
+| is blocked     |
+| needs CAPTCHA  |
++-------+--------+
+        |
+        v
++----------------+
+| Save status,   |
+| reason, and    |
+| screenshots    |
++-------+--------+
+        |
+        v
++----------------+
+| More websites  |
+| or URLs left?  |
++---+--------+---+
+    | yes    | no
+    v        v
++------+  +----------------+
+| Next |  | Final report   |
+| try  |  | is created     |
++------+  +----------------+
 ```
 
-The agentic path works as a loop: inspect the current page, decide the next safe browser action, take that action, then check whether the task is complete. If CAPTCHA appears, the attempt fails with a clear reason because CAPTCHA solving is not implemented. If the page requires login, payment, account creation, email verification, or another unsupported step, the agent skips or fails the attempt with a clear reason.
+Job creation is handled by `app.services.jobs.create_submission_job()`. It validates URL syntax, resolves selected site IDs from `config/sites.yaml`, stores a `SubmissionJob`, expands each URL/site pair into a `SubmissionAttempt`, and records creation events.
+
+Worker execution starts in `worker.tasks.SequentialWorker`. `run_once()` selects the oldest job whose status is `queued` or `running`, then calls `worker.execution.AutomationRunner.run_job()`. `run_job()` marks the job running, executes queued/running attempts in database order, then finishes the job and writes a report. The current implementation does not schedule retries even though `max_attempts`, `retry_count`, and retry status constants exist.
+
+Each attempt uses the agentic path in `AutomationRunner.run_agentic_attempt()`:
+
+1. Mark the attempt running and record `agent_started`.
+2. Apply the configured pre-attempt delay and record `polite_delay` when nonzero.
+3. Create or reuse a browser profile when `browser_profile_enabled` is true.
+4. Load up to three approved site-memory strategies for the same site.
+5. Build a browser-use task with redacted attempt context, target URL variants, action constraints, CAPTCHA handling instructions, and unsupported-step guardrails.
+6. Run local browser-use with `ChatOpenAI`, `use_vision=True`, one action per step, and `AGENTIC_MAX_STEPS`.
+7. Copy browser-use history screenshots into `ARTIFACT_DIR/<job_id>/<attempt_id>/` and record `artifact_saved` events for copied files.
+8. Parse the agent's compact JSON into `AgentResult` and map it to a terminal attempt status.
+
+Result mapping is centralized in `AutomationRunner.apply_agent_result()`:
+
+- `success` records approved site memory when a strategy summary is present and marks the attempt `success`.
+- `login_required`, `restricted_checkpoint`, and `skipped` are treated as skipped attempts with a recorded reason.
+- CAPTCHA statuses are mapped to `failed` with the standard "CAPTCHA solving is not implemented" reason when the agent does not provide a more specific reason.
+- Known failure statuses are persisted directly; unknown statuses become `agent_uncertain`.
+
+Reports are generated by `app.services.reports`. The system writes JSON and Markdown files under `REPORT_DIR`, stores the same content in the `job_reports` table, restores missing report files from the database when possible, and exposes report data through the dashboard and API.
 
 ## Core Behavior
 
 - Jobs contain one attempt per URL/site pair.
-- Each target service uses the browser-use agentic runner.
+- The web app creates and displays jobs; the worker executes jobs.
+- Each target service currently uses the browser-use agentic runner.
 - Agentic runs receive only the selected site, submitted URL, allowed context, approved profile path, and approved site memory.
-- Browser profiles are optional per site and can be reset from the dashboard.
+- Browser profiles are enabled by default per normalized site config and can be reset from the dashboard.
 - Successful agent strategies can be stored as site memory and reused after sensitive values are redacted.
+- A job is marked `completed` only when every attempt succeeds; otherwise it is marked `failed`.
+- Retry metadata exists in the model and status constants, but the active worker path currently executes each attempt once.
 
 ## Crawler Reliability
 
-The crawler applies browser‑session controls that improve stability and reduce friction with target services. These controls help the browser agent operate reliably while mimicking natural human behavior patterns—such as varied typing speeds, mouse movements, scrolling, and realistic session persistence—to improve compatibility with the sites it interacts with.
+The browser automation package applies browser-session controls that improve stability and reduce friction with target services. The active implementation uses local browser-use with Playwright/Chromium, fixed realistic browser defaults, persisted profiles where configured, request header overrides, a Playwright stealth init script, and configurable delays.
 
 Key settings include:
 
-- Configurable action delays and retry backoff.
-- Stable viewport, navigation timeout, and action timeout settings.
-- Persisted browser profiles when a site is explicitly configured for profile reuse.
-- Consent, login, CAPTCHA, rate-limit, and restricted-checkpoint detection.
+- Configurable pre-attempt and between-action delays.
+- Stable viewport, request headers, user agent, navigation timeout, and action timeout settings.
+- Persisted browser profiles by default, unless a site disables profile reuse.
+- Agent instructions for consent, login, CAPTCHA, rate-limit, and restricted-checkpoint outcomes.
 - Clear reporting when a target service blocks, rejects, or cannot complete an attempt.
 
-These measures are applied for reliability, observability, and respectful low‑volume operation. The system does not rotate identities to avoid limits, solve CAPTCHA, or perform high‑volume submissions.
+These measures are applied for reliability, observability, and respectful low-volume operation. The system does not rotate identities to avoid limits, solve CAPTCHA, or perform high-volume submissions.
 
 ## Checkpoints
 
@@ -172,13 +186,13 @@ Sensitive or unsupported actions are not handed to a human checkpoint. Payment, 
 
 ## Reporting
 
-Each finished run writes screenshots where useful and JSON/Markdown reports under `reports/`. Reports include runner mode, CAPTCHA policy, attempt status, retry count, checkpoint count, latest agent confidence, final evidence, and artifact paths.
+Each finished run writes screenshots where available and JSON/Markdown reports under `reports/`. Reports include runner mode, CAPTCHA policy, attempt status, retry count, checkpoint count, latest agent confidence, final evidence, artifact paths, attempts, events, timestamps, and duration.
 
 ## Boundaries
 
 - No high-volume automation.
 - No CAPTCHA solver or CAPTCHA provider integration.
 - No email or OTP automation.
-- Mimics human-like interaction patterns (e.g., randomized delays, realistic viewport usage, and natural input sequences) to reduce detection friction, but does not solve CAPTCHA, automate email/OTP, or perform high-volume submissions.
+- Uses realistic browser defaults, persisted profiles, request headers, stealth initialization, and pacing to reduce avoidable browser friction, but does not solve CAPTCHA, automate email/OTP, or perform high-volume submissions.
 - No unrestricted browsing.
 - Prefer a clear skip or failure over an unverified success.
