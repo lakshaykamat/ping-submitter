@@ -34,7 +34,7 @@ def build_agent_task(site, submitted_url, attempt_context, min_delay, max_delay)
             f"Wait at least {min_delay} and at most {max_delay} seconds between browser actions. Do not click randomly.",
             "After submit, wait for the page to settle. Continue only if another required confirmation step is visible.",
             "Stop once the site confirms acceptance. Do not continue browsing after success.",
-            f"If CAPTCHA appears, return status failed with evidence.reason set to: {CAPTCHA_FAILURE_REASON}",
+            captcha_instruction(attempt_context),
             "If rate limiting, automated-traffic blocking, access denied, forbidden, unavailable service, or another anti-abuse checkpoint appears, return status restricted_checkpoint with evidence.reason.",
             "If login is required and credentials are unavailable, return status login_required.",
             "If payment, signup, account changes, deletion, subscription, email/OTP verification, or another unsupported irreversible step is required, return status skipped.",
@@ -44,6 +44,16 @@ def build_agent_task(site, submitted_url, attempt_context, min_delay, max_delay)
             f"Attempt context: {json.dumps(context, sort_keys=True)}",
         ]
     )
+
+
+def captcha_instruction(attempt_context):
+    if (attempt_context or {}).get("captcha_policy") == "solve":
+        return (
+            "If CAPTCHA appears, wait for the configured solver to finish, then continue with the visible "
+            "submission flow. If the solver fails or the CAPTCHA remains unsolved, return status captcha_failed "
+            "with evidence.reason."
+        )
+    return f"If CAPTCHA appears, return status failed with evidence.reason set to: {CAPTCHA_FAILURE_REASON}"
 
 
 def profile_instruction(profile_directory):

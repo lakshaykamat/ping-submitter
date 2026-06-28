@@ -12,8 +12,10 @@ from packages.browser_automation.config import (
 from packages.browser_automation.errors import BrowserUseAgentError
 from packages.browser_automation.prompts import build_agent_task
 from packages.browser_automation.results import parse_agent_result, result_with_history_metadata
+from packages.captcha_solver import OhMyCaptchaClient, solve_browser_use_captcha
 
 STEALTH_INIT_SCRIPT_ID_ATTR = "_job_assessment_playwright_stealth_init_script_id"
+SOLVED_CAPTCHA_URLS_ATTR = "_job_assessment_solved_captcha_urls"
 
 
 class BrowserUseAgentRunner:
@@ -68,7 +70,13 @@ class BrowserUseAgentRunner:
             self.session_event_recorder(site, attempt_context, settings)
 
         browser_profile = BrowserProfile(**browser_profile_options(settings, attempt_context))
-        browser_session = browser_session_with_headers(BrowserSession)(browser_profile=browser_profile)
+        captcha_client = captcha_solver_client(settings, attempt_context)
+        browser_session_class = browser_session_with_headers(
+            BrowserSession,
+            captcha_policy=attempt_context.get("captcha_policy"),
+            captcha_client=captcha_client,
+        )
+        browser_session = browser_session_class(browser_profile=browser_profile)
         agent = Agent(
             task=task,
             llm=ChatOpenAI(model=model),
@@ -102,9 +110,19 @@ def browser_profile_options(settings, attempt_context):
         "window_size": DEFAULT_VIEWPORT,
         "accept_downloads": False,
         "permissions": [],
-        "captcha_solver": False,
+        "captcha_solver": captcha_solving_enabled(attempt_context),
         "args": list(DEFAULT_BROWSER_ARGS),
     }
+
+
+def captcha_solving_enabled(attempt_context):
+    return attempt_context.get("captcha_policy") == "solve"
+
+
+def captcha_solver_client(settings, attempt_context):
+    if not captcha_solving_enabled(attempt_context):
+        return None
+    return OhMyCaptchaClient(settings=settings.captcha_solver_settings())
 
 
 async def apply_cdp_request_headers(cdp_session, headers=None):
@@ -157,7 +175,7 @@ async def apply_playwright_stealth(cdp_session, script=None):
     setattr(cdp_session, STEALTH_INIT_SCRIPT_ID_ATTR, script_identifier or True)
 
 
-def browser_session_with_headers(base_session_class):
+def browser_session_with_headers(base_session_class, captcha_policy="none", captcha_client=None):
     class BrowserSessionWithHeaders(base_session_class):
         async def _navigate_and_wait(
             self,
@@ -177,5 +195,32 @@ def browser_session_with_headers(base_session_class):
                 wait_until=wait_until,
                 nav_timeout=nav_timeout,
             )
+
+        async def wait_if_captcha_solving(self, timeout=None):
+            browser_use_result = await super().wait_if_captcha_solving(timeout=timeout)
+            if browser_use_result is not None:
+                return browser_use_result
+
+            if captcha_policy != "solve":
+                return None
+
+            page = await self.get_current_page()
+            if page is None:
+                return None
+
+            page_url = await page.get_url()
+            solved_urls = getattr(self, SOLVED_CAPTCHA_URLS_ATTR, set())
+            if page_url in solved_urls:
+                return None
+
+            captcha_result = await solve_browser_use_captcha(page, client=captcha_client)
+            if captcha_result is None:
+                return None
+
+            if captcha_result.result == "success":
+                solved_urls.add(page_url)
+                setattr(self, SOLVED_CAPTCHA_URLS_ATTR, solved_urls)
+
+            return captcha_result
 
     return BrowserSessionWithHeaders

@@ -12,7 +12,13 @@ class Config:
     ARTIFACT_DIR = os.environ.get("ARTIFACT_DIR", str(BASE_DIR / "reports" / "artifacts"))
     BROWSER_PROFILE_DIR = os.environ.get("BROWSER_PROFILE_DIR", str(BASE_DIR / "browser_profiles"))
     SITES_CONFIG_PATH = os.environ.get("SITES_CONFIG_PATH", str(BASE_DIR / "config" / "sites.yaml"))
+    CAPTCHA_POLICY_DEFAULT = os.environ.get("CAPTCHA_POLICY_DEFAULT", "none")
     CAPTCHA_WAIT_SECONDS = int(os.environ.get("CAPTCHA_WAIT_SECONDS", "120"))
+    OHMYCAPTCHA_BASE_URL = os.environ.get("OHMYCAPTCHA_BASE_URL", "http://127.0.0.1:8000")
+    OHMYCAPTCHA_CLIENT_KEY = os.environ.get("OHMYCAPTCHA_CLIENT_KEY", os.environ.get("CLIENT_KEY", ""))
+    OHMYCAPTCHA_REQUEST_TIMEOUT_SECONDS = float(os.environ.get("OHMYCAPTCHA_REQUEST_TIMEOUT_SECONDS", "30"))
+    OHMYCAPTCHA_POLL_INTERVAL_SECONDS = float(os.environ.get("OHMYCAPTCHA_POLL_INTERVAL_SECONDS", "2"))
+    OHMYCAPTCHA_MAX_WAIT_SECONDS = float(os.environ.get("OHMYCAPTCHA_MAX_WAIT_SECONDS", "120"))
     PLAYWRIGHT_HEADLESS = os.environ.get("PLAYWRIGHT_HEADLESS", "true").lower() == "true"
     PLAYWRIGHT_NAVIGATION_TIMEOUT_MS = int(os.environ.get("PLAYWRIGHT_NAVIGATION_TIMEOUT_MS", "30000"))
     PLAYWRIGHT_ACTION_TIMEOUT_MS = int(os.environ.get("PLAYWRIGHT_ACTION_TIMEOUT_MS", "10000"))

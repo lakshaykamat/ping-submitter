@@ -3,6 +3,8 @@ import pytest
 from app import create_app
 from app.models import JobEvent, SubmissionJob, get_session
 from app.services import create_submission_job
+from packages.browser_automation.types import AgentResult
+from worker.execution import AutomationRunner
 from worker.tasks import SequentialWorker
 
 
@@ -45,6 +47,15 @@ class CompletingRunner:
 class FailingRunner:
     def run_job(self, job_id):
         raise RuntimeError("browser crashed")
+
+
+class CaptchaFailedAgentRunner:
+    def submit_url(self, site_config, submitted_url, attempt_context):
+        return AgentResult(
+            status="captcha_failed",
+            message="CAPTCHA solver failed.",
+            evidence={"reason": "solver rejected task"},
+        )
 
 
 def test_run_once_runs_oldest_runnable_job(app):
@@ -91,3 +102,17 @@ def test_run_once_marks_job_failed_when_runner_raises(app):
         assert worker_event.level == "error"
         assert worker_event.context["error"] == "browser crashed"
         assert failed_job.report is not None
+
+
+def test_automation_runner_preserves_captcha_failure_status(app):
+    with app.app_context():
+        job = create_test_job("https://example.com/captcha")
+
+        AutomationRunner(agentic_runner=CaptchaFailedAgentRunner(), sleep=lambda seconds: None).run_job(job.id)
+
+        failed_job = get_session().get(SubmissionJob, job.id)
+        attempt = failed_job.attempts[0]
+
+        assert failed_job.status == "failed"
+        assert attempt.status == "captcha_failed"
+        assert attempt.failure_reason == "CAPTCHA solver failed."

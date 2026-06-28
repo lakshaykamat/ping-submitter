@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+from packages.captcha_solver import OhMyCaptchaSettings
+
 
 DEFAULT_VIEWPORT = {"width": 1365, "height": 768}
 DEFAULT_USER_AGENT = (
@@ -36,6 +38,11 @@ class BrowserAgentSettings:
     min_action_delay_seconds: float
     max_action_delay_seconds: float
     artifact_dir: Path
+    ohmycaptcha_base_url: str = "http://127.0.0.1:8000"
+    ohmycaptcha_client_key: str = ""
+    ohmycaptcha_request_timeout_seconds: float = 30.0
+    ohmycaptcha_poll_interval_seconds: float = 2.0
+    ohmycaptcha_max_wait_seconds: float = 120.0
 
     @classmethod
     def from_mapping(cls, config):
@@ -49,6 +56,15 @@ class BrowserAgentSettings:
             min_action_delay_seconds=float(config["AGENTIC_MIN_ACTION_DELAY_SECONDS"]),
             max_action_delay_seconds=float(config["AGENTIC_MAX_ACTION_DELAY_SECONDS"]),
             artifact_dir=Path(config["ARTIFACT_DIR"]),
+            ohmycaptcha_base_url=config["OHMYCAPTCHA_BASE_URL"],
+            ohmycaptcha_client_key=config["OHMYCAPTCHA_CLIENT_KEY"],
+            ohmycaptcha_request_timeout_seconds=float(
+                config["OHMYCAPTCHA_REQUEST_TIMEOUT_SECONDS"]
+            ),
+            ohmycaptcha_poll_interval_seconds=float(
+                config["OHMYCAPTCHA_POLL_INTERVAL_SECONDS"]
+            ),
+            ohmycaptcha_max_wait_seconds=float(config["OHMYCAPTCHA_MAX_WAIT_SECONDS"]),
         )
 
     from_flask_config = from_mapping
@@ -59,3 +75,12 @@ class BrowserAgentSettings:
         if max_delay < min_delay:
             return max_delay, min_delay
         return min_delay, max_delay
+
+    def captcha_solver_settings(self):
+        return OhMyCaptchaSettings(
+            base_url=self.ohmycaptcha_base_url,
+            client_key=self.ohmycaptcha_client_key,
+            request_timeout_seconds=self.ohmycaptcha_request_timeout_seconds,
+            poll_interval_seconds=self.ohmycaptcha_poll_interval_seconds,
+            max_wait_seconds=self.ohmycaptcha_max_wait_seconds,
+        )

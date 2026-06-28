@@ -3,6 +3,7 @@ sites:
     name: Ping-O-Matic
     url: https://pingomatic.com/
     enabled: true
+    captcha_policy: solve
   - id: sitesondisplay
     name: Sites On Display
     url: https://www.sitesondisplay.com/add.html
@@ -11,14 +12,17 @@ sites:
     name: Index Kings
     url: http://www.indexkings.com/index.php
     enabled: true
+    captcha_policy: solve
   - id: pingmyurls
     name: Ping My URLs
     url: https://www.pingmyurls.com/
     enabled: true
+    captcha_policy: solve
   - id: bulklink
     name: BulkLink
     url: http://bulklink.org/
     enabled: true
+    captcha_policy: solve
   - id: wmtools_mass_ping
     name: WMTools Mass Ping
     url: https://wmtools.me/mass-ping

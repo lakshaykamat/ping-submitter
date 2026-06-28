@@ -56,9 +56,9 @@ class AutomationRunner:
     def run_attempt(self, job, attempt):
         site_config = self.site_config(attempt.site_id)
         attempt.runner_mode = "agentic"
-        attempt.captcha_policy = "none"
+        attempt.captcha_policy = site_config.get("captcha_policy", attempt.captcha_policy or "none")
         site_config["runner_mode"] = "agentic"
-        site_config["captcha_policy"] = "none"
+        site_config["captcha_policy"] = attempt.captcha_policy
 
         try:
             self.run_agentic_attempt(job, attempt, site_config)
@@ -73,7 +73,7 @@ class AutomationRunner:
                 "name": site_id,
                 "url": "",
                 "runner_mode": "agentic",
-                "captcha_policy": "none",
+                "captcha_policy": current_app.config["CAPTCHA_POLICY_DEFAULT"],
             }
         return site
 
@@ -341,8 +341,6 @@ def agent_reason(result):
 
 
 def agent_failure_status(status):
-    if status in CAPTCHA_AGENT_STATUSES:
-        return "failed"
     if status in AGENT_FAILURE_STATUSES:
         return status
     return "agent_uncertain"

@@ -9,6 +9,8 @@ from packages.browser_automation.client import (
     apply_playwright_stealth,
     browser_profile_options,
     browser_session_with_headers,
+    captcha_solving_enabled,
+    captcha_solver_client,
     playwright_stealth_script,
 )
 from packages.browser_automation.config import (
@@ -100,6 +102,19 @@ def test_agent_task_allows_scrolling_to_find_hidden_forms():
     assert "scroll back up and inspect earlier sections" in task
 
 
+def test_agent_task_uses_solver_instruction_when_captcha_policy_is_solve():
+    task = build_agent_task(
+        site={"url": "https://pingomatic.com/"},
+        submitted_url="https://example.com",
+        attempt_context={"captcha_policy": "solve"},
+        min_delay=0.6,
+        max_delay=2.0,
+    )
+
+    assert "wait for the configured solver to finish" in task
+    assert "CAPTCHA solving is not implemented" not in task
+
+
 def test_copy_history_screenshots_deduplicates_and_records_events(tmp_path):
     source = tmp_path / "source.png"
     source.write_bytes(b"fake image")
@@ -162,6 +177,54 @@ def test_browser_profile_options_use_normal_local_browser_defaults(tmp_path):
     assert options["permissions"] == []
     assert options["captcha_solver"] is False
     assert options["args"] == DEFAULT_BROWSER_ARGS
+
+
+def test_browser_profile_options_enable_captcha_solver_for_solve_policy(tmp_path):
+    settings = BrowserAgentSettings(
+        headless=True,
+        navigation_timeout_ms=30000,
+        action_timeout_ms=10000,
+        slow_mo_ms=0,
+        agentic_llm_model="gpt-test",
+        agentic_max_steps=80,
+        min_action_delay_seconds=0.6,
+        max_action_delay_seconds=2.0,
+        artifact_dir=tmp_path / "artifacts",
+    )
+
+    options = browser_profile_options(
+        settings,
+        {
+            "browser_profile_directory": str(tmp_path / "profile"),
+            "captcha_policy": "solve",
+        },
+    )
+
+    assert captcha_solving_enabled({"captcha_policy": "solve"}) is True
+    assert captcha_solving_enabled({"captcha_policy": "none"}) is False
+    assert options["captcha_solver"] is True
+
+
+def test_captcha_solver_client_uses_browser_agent_settings(tmp_path):
+    settings = BrowserAgentSettings(
+        headless=True,
+        navigation_timeout_ms=30000,
+        action_timeout_ms=10000,
+        slow_mo_ms=0,
+        agentic_llm_model="gpt-test",
+        agentic_max_steps=80,
+        min_action_delay_seconds=0.6,
+        max_action_delay_seconds=2.0,
+        artifact_dir=tmp_path / "artifacts",
+        ohmycaptcha_base_url="http://127.0.0.1:8000",
+        ohmycaptcha_client_key="client-key",
+    )
+
+    client = captcha_solver_client(settings, {"captcha_policy": "solve"})
+
+    assert client.settings.base_url == "http://127.0.0.1:8000"
+    assert client.settings.client_key == "client-key"
+    assert captcha_solver_client(settings, {"captcha_policy": "none"}) is None
 
 
 class FakeNetworkCommands:
